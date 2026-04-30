@@ -33,6 +33,20 @@ REGRAS OBRIGATORIAS:
 - O JSON deve ser valido e parseable com JSON.parse()
 - Seja criativo e coerente com o mundo da campanha`
 
+  function aiErrorMessage(err) {
+    const message = err?.message ?? 'Erro desconhecido.'
+    if (/Groq nao configurado/i.test(message)) {
+      return 'IA nao configurada no backend. Defina GROQ_API_KEY no Fly.'
+    }
+    if (/api key|unauthorized|authentication/i.test(message)) {
+      return 'Falha ao autenticar na Groq. Verifique GROQ_API_KEY no Fly.'
+    }
+    if (/model/i.test(message)) {
+      return `Falha ao gerar com IA: modelo da Groq invalido ou indisponivel (${message}).`
+    }
+    return `Falha ao gerar com IA: ${message}`
+  }
+
   fastify.post('/campaigns/:campaignId/ai/npc', { preHandler: requireEditor }, async (req, reply) => {
     try {
       const ctx = await getCampaignContext(req.params.campaignId)
@@ -43,7 +57,7 @@ Retorne JSON:
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar NPC com IA')
-      return reply.status(500).send({ error: 'Falha ao gerar NPC com IA. Verifique a configuracao da Groq e tente novamente.' })
+      return reply.status(500).send({ error: aiErrorMessage(err) })
     }
   })
 
@@ -68,7 +82,7 @@ Retorne JSON:
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar local com IA')
-      return reply.status(500).send({ error: 'Falha ao gerar local com IA. Verifique a configuracao da Groq e tente novamente.' })
+      return reply.status(500).send({ error: aiErrorMessage(err) })
     }
   })
 
@@ -101,7 +115,7 @@ Retorne JSON:
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar encontro com IA')
-      return reply.status(500).send({ error: 'Falha ao gerar encontro com IA. Verifique a configuracao da Groq e tente novamente.' })
+      return reply.status(500).send({ error: aiErrorMessage(err) })
     }
   })
 

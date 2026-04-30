@@ -36,7 +36,11 @@ fastify.register(chatRoutes)
 
 fastify.get('/health', async () => ({ status: 'ok' }))
 
-await ensureBucket()
+try {
+  await ensureBucket()
+} catch (err) {
+  fastify.log.error({ err }, 'Falha ao preparar bucket de imagens')
+}
 
 const port = Number(process.env.PORT) || 3333
 await fastify.listen({ port, host: '0.0.0.0' })

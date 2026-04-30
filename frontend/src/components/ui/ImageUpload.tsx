@@ -61,8 +61,8 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
         body: form,
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error)
+        const err = await res.json().catch(() => ({ error: `Erro ${res.status} ao enviar imagem.` }))
+        throw new Error(err.error ?? `Erro ${res.status} ao enviar imagem.`)
       }
       const { url } = await res.json()
       setPreview(url)
