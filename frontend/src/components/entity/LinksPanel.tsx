@@ -1,0 +1,259 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Calendar, GitBranch, Link2, Plus, X } from 'lucide-react'
+import { useCreateLink, useDeleteLink } from '@/hooks/useLinks'
+import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
+import { useEntityList } from '@/hooks/useEntities'
+import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
+import { TagBadge } from '@/components/ui/TagBadge'
+import { Button } from '@/components/ui/Button'
+import type { Arc, EntityLink, EntityType, LinkableType, Session, Tag } from '@/types'
+import { clsx } from 'clsx'
+
+interface Props {
+  campaignId: string
+  entityType: LinkableType
+  entityId: string
+  links: EntityLink[]
+  tags: Tag[]
+  canEdit: boolean
+}
+
+type LinkableOption = {
+  type: LinkableType
+  label: string
+  labelPlural: string
+  icon: React.ElementType
+  accentClass: string
+}
+
+const EXTRA_LINKABLES: LinkableOption[] = [
+  { type: 'arcs', label: 'Arco', labelPlural: 'Arcos', icon: GitBranch, accentClass: 'text-gold' },
+  { type: 'sessions', label: 'Sessao', labelPlural: 'Sessoes', icon: Calendar, accentClass: 'text-sky-300' },
+]
+
+const RELATION_SUGGESTIONS = [
+  'aparece em',
+  'acontece em',
+  'conhece',
+  'possui',
+  'pertence a',
+  'protege',
+  'ameaca',
+  'investiga',
+  'revela',
+]
+
+function getLinkableOption(type: LinkableType): LinkableOption | undefined {
+  if (type in ENTITY_CONFIG) {
+    const cfg = ENTITY_CONFIG[type as EntityType]
+    return { type, label: cfg.label, labelPlural: cfg.labelPlural, icon: cfg.icon, accentClass: cfg.accentClass }
+  }
+  return EXTRA_LINKABLES.find(option => option.type === type)
+}
+
+function isEntityType(type: LinkableType): type is EntityType {
+  return type in ENTITY_CONFIG
+}
+
+export function LinksPanel({ campaignId, entityType, entityId, links, tags, canEdit }: Props) {
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({ target_type: '' as LinkableType | '', target_id: '', relation_label: '' })
+
+  const createLink = useCreateLink(campaignId)
+  const deleteLink = useDeleteLink(campaignId)
+
+  const characters = useEntityList(campaignId, 'characters')
+  const npcs = useEntityList(campaignId, 'npcs')
+  const locations = useEntityList(campaignId, 'locations')
+  const items = useEntityList(campaignId, 'items')
+  const spells = useEntityList(campaignId, 'spells')
+  const creatures = useEntityList(campaignId, 'creatures')
+  const notes = useEntityList(campaignId, 'notes')
+  const arcs = useArcs(campaignId)
+  const sessions = useCampaignSessions(campaignId)
+
+  const lists: Partial<Record<LinkableType, any[]>> = {
+    characters: characters.data ?? [],
+    npcs: npcs.data ?? [],
+    locations: locations.data ?? [],
+    items: items.data ?? [],
+    spells: spells.data ?? [],
+    creatures: creatures.data ?? [],
+    notes: notes.data ?? [],
+    arcs: arcs.data ?? [],
+    sessions: sessions.data ?? [],
+  }
+
+  const linkableOptions: LinkableOption[] = [
+    ...ENTITY_TYPES.map(type => getLinkableOption(type)!),
+    ...EXTRA_LINKABLES,
+  ]
+
+  const targetOptions = form.target_type
+    ? (lists[form.target_type] ?? []).filter((item: any) => !(form.target_type === entityType && item.id === entityId))
+    : []
+
+  const submit = async () => {
+    if (!form.target_type || !form.target_id) return
+    await createLink.mutateAsync({
+      source_type: entityType,
+      source_id: entityId,
+      target_type: form.target_type,
+      target_id: form.target_id,
+      relation_label: form.relation_label || undefined,
+    })
+    setAdding(false)
+    setForm({ target_type: '', target_id: '', relation_label: '' })
+  }
+
+  const getLinkedTarget = (link: EntityLink) => {
+    const isSource = link.source_id === entityId && link.source_type === entityType
+    return {
+      type: isSource ? link.target_type : link.source_type,
+      id: isSource ? link.target_id : link.source_id,
+    }
+  }
+
+  const displayName = (type: LinkableType, item: any) => {
+    if (isEntityType(type)) return ENTITY_CONFIG[type].displayName(item)
+    if (type === 'arcs') return (item as Arc).title
+    if (type === 'sessions') {
+      const session = item as Session & { arc_title?: string }
+      return [session.title, session.arc_title].filter(Boolean).join(' - ')
+    }
+    return item.title ?? item.name ?? item.id
+  }
+
+  const itemPath = (type: LinkableType, item: any, id: string) => {
+    if (type === 'arcs') return `/campaigns/${campaignId}/arcs/${id}`
+    if (type === 'sessions') return `/campaigns/${campaignId}/arcs/${item?.arc_id}/sessions/${id}`
+    return `/campaigns/${campaignId}/${type}/${id}`
+  }
+
+  const findItem = (type: LinkableType, id: string) => (lists[type] ?? []).find((item: any) => item.id === id)
+  const title = entityType === 'sessions' ? 'Contexto da sessao' : 'Conexoes'
+
+  return (
+    <aside className="w-72 shrink-0 flex flex-col gap-6">
+      {tags.length > 0 && (
+        <div>
+          <p className="text-xs text-parchment/30 uppercase tracking-widest mb-2">Tags</p>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map(t => <TagBadge key={t.id} tag={t} />)}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-1.5">
+            <Link2 size={11} /> {title}
+          </p>
+          {canEdit && (
+            <button
+              onClick={() => setAdding(a => !a)}
+              className="text-parchment/30 hover:text-gold transition-colors"
+              title="Adicionar conexao"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="bg-stone-200 border border-stone-300 rounded-lg p-3 mb-3 flex flex-col gap-2">
+            <select
+              value={form.target_type}
+              onChange={e => setForm(f => ({ ...f, target_type: e.target.value as LinkableType, target_id: '' }))}
+              className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 focus:outline-none"
+            >
+              <option value="">Conectar com...</option>
+              {linkableOptions.map(option => (
+                <option key={option.type} value={option.type}>{option.labelPlural}</option>
+              ))}
+            </select>
+
+            {form.target_type && (
+              <select
+                value={form.target_id}
+                onChange={e => setForm(f => ({ ...f, target_id: e.target.value }))}
+                className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 focus:outline-none"
+              >
+                <option value="">Selecionar...</option>
+                {targetOptions.map((item: any) => (
+                  <option key={item.id} value={item.id}>
+                    {displayName(form.target_type as LinkableType, item)}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <input
+              list="relation-suggestions"
+              value={form.relation_label}
+              onChange={e => setForm(f => ({ ...f, relation_label: e.target.value }))}
+              placeholder="Relacao: aparece em, protege, revela..."
+              className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 placeholder-parchment/30 focus:outline-none"
+            />
+            <datalist id="relation-suggestions">
+              {RELATION_SUGGESTIONS.map(relation => <option key={relation} value={relation} />)}
+            </datalist>
+
+            <div className="flex gap-2 mt-1">
+              <Button size="sm" onClick={submit} loading={createLink.isPending} className="flex-1">Conectar</Button>
+              <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+
+        {links.length === 0 && !adding && (
+          <p className="text-xs text-parchment/25 italic">
+            {entityType === 'sessions'
+              ? 'Conecte locais, NPCs, personagens, notas e acontecimentos para montar o contexto vivo desta sessao.'
+              : 'Nenhuma conexao ainda.'}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {links.map(link => {
+            const { type, id } = getLinkedTarget(link)
+            const meta = getLinkableOption(type)
+            if (!meta) return null
+            const Icon = meta.icon
+            const item = findItem(type, id)
+            const name = item ? displayName(type, item) : id
+            return (
+              <div key={link.id} className="flex items-center gap-2 group">
+                <Link
+                  to={itemPath(type, item, id)}
+                  className="flex items-center gap-2 flex-1 bg-stone-200 hover:bg-stone-300 rounded px-2.5 py-2 transition-colors min-w-0"
+                >
+                  <Icon size={13} className={clsx('shrink-0', meta.accentClass)} />
+                  <div className="min-w-0">
+                    <p className="text-xs text-parchment truncate">
+                      {link.relation_label && (
+                        <span className="text-parchment/40 mr-1">{link.relation_label} -</span>
+                      )}
+                      {name}
+                    </p>
+                    <p className="text-xs text-parchment/30">{meta.label}</p>
+                  </div>
+                </Link>
+                {canEdit && (
+                  <button
+                    onClick={() => deleteLink.mutate(link.id)}
+                    className="opacity-0 group-hover:opacity-100 text-parchment/30 hover:text-crimson transition-all"
+                    title="Remover conexao"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </aside>
+  )
+}

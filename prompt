@@ -1,0 +1,8 @@
+sobre a ferramenta de ajuste de imagem:
+
+adicione mais opções para formato padrão da imagem. quando eu mexo no medidor de zoom, horizontal e vertical, a imagem não mexe ou sofre alteração. independente do tamanho que o usuário escolher a imagem, a caixa da imagem deve cobrir apenas o entorno dela, sem que fique um espaço vazio dos lados ou acima. faça a caixa ser inteligente.
+
+sobre a ferramenta de convidar membro, AINDA não existe seperação entre criar um código e enviar um convite por email. você não tem um botão para confirmar o envio depois que você insere o email, o ÚNICO botão é o para gerar código.
+
+Insira um sistema de "Cargos", para definir o Mestre da Campanha e os jogadores. isso não interfere com viewer, editor e admin. crie a opção que, quando um jogador criar algo, ele pode compartilhar exclusivamente apenas para o mestre e os admins, ao invés de liberar para todos os jogadores. faça com que um admin/mestre também possa escolher um usuário único para poder ver alguma criação. PENSE PRIMEIRO EM COMO IMPLEMENTAR TUDO ISSO e qual a melhor maneira pensando em qualidade e segurança. evite que qualquer etapa ou processo de todo o sistema possa vazar informações exclusivas de admins, mestres ou jogadores. tome todas as providências necessárias e implemente em etapas.
+

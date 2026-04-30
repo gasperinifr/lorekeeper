@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <g fill="none" stroke="#d6a84f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path fill="#1e1712" fill-opacity=".96" d="M32 4 58 19 52 49 32 60 12 49 6 19 32 4Z"/>
+    <path d="M32 4v56M6 19l26 13 26-13M12 49l20-17 20 17M18 12l14 20 14-20"/>
+  </g>
+  <text x="32" y="29" text-anchor="middle" dominant-baseline="central"
+        font-family="Georgia, 'Times New Roman', serif" font-size="18" font-weight="700"
+        fill="#f4e8c9">20</text>
+</svg>
