@@ -231,6 +231,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
           entityType={entityType!}
           entityId={entityId!}
           links={entity.links ?? []}
+          eventLinks={entity.event_links ?? []}
           tags={entity.tags ?? []}
           canEdit={!!canEdit}
         />

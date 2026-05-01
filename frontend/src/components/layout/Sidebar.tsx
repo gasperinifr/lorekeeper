@@ -4,6 +4,7 @@ import {
   BookOpen, Map, Users, Sword, Package, Scroll,
   GitBranch, Calendar, Search, Settings, ChevronLeft,
   Skull, Home, LogOut, MessageSquare, Network, Sparkles,
+  BookMarked,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCampaign } from '@/hooks/useCampaign'
@@ -21,6 +22,7 @@ const WORLD_SECTIONS = [
 const NARRATIVE_SECTIONS = [
   { label: 'Arcos & Atos', icon: GitBranch, path: 'arcs' },
   { label: 'Sessões',      icon: Calendar,  path: 'sessions' },
+  { label: 'Crônica',      icon: BookMarked, path: 'chronicle' },
 ]
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {

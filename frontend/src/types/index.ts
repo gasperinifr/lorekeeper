@@ -127,4 +127,57 @@ export interface WorldEntity {
 }
 
 export type EntityType = 'characters' | 'npcs' | 'locations' | 'items' | 'spells' | 'creatures' | 'notes'
-export type LinkableType = EntityType | 'arcs' | 'sessions' | 'encounters'
+export type LinkableType = EntityType | 'arcs' | 'sessions' | 'encounters' | 'events'
+
+export type EventType =
+  | 'batalha' | 'revelacao' | 'morte' | 'alianca' | 'descoberta'
+  | 'traicao' | 'destruicao' | 'evento_magico' | 'politico' | 'outro'
+
+export type EventImpact = 'menor' | 'significativo' | 'divisor'
+
+export interface EventEntityLink {
+  id: string
+  event_id: string
+  campaign_id: string
+  entity_type: LinkableType
+  entity_id: string
+  role?: string
+  created_at: string
+}
+
+export interface EntityEventLink extends EventEntityLink {
+  event_title: string
+  event_type: EventType
+  event_impact: EventImpact
+  event_date_in_world?: string | null
+  event_visibility?: 'public' | 'private'
+}
+
+export interface CampaignEvent {
+  id: string
+  campaign_id: string
+  session_id?: string | null
+  arc_id?: string | null
+  created_by?: string | null
+  title: string
+  type: EventType
+  impact: EventImpact
+  date_in_world?: string | null
+  description?: string | null
+  visibility: 'public' | 'private'
+  data?: Record<string, unknown>
+  session_title?: string
+  arc_title?: string
+  created_by_username?: string
+  entity_links: EventEntityLink[]
+  created_at: string
+  updated_at: string
+}
+
+export interface PropagationConsequence {
+  entity_type: string
+  entity_id: string
+  field: string
+  value: unknown
+  label?: string
+}

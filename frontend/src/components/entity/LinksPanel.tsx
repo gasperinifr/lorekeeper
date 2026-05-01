@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, GitBranch, Link2, Plus, X } from 'lucide-react'
+import { BookMarked, Calendar, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { useCreateLink, useDeleteLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
 import { useEntityList } from '@/hooks/useEntities'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
+import { useAddEventLink, useEvents } from '@/hooks/useEvents'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
-import type { Arc, EntityLink, EntityType, LinkableType, Session, Tag } from '@/types'
+import type { Arc, EntityEventLink, EntityLink, EntityType, LinkableType, Session, Tag } from '@/types'
 import { clsx } from 'clsx'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   entityType: LinkableType
   entityId: string
   links: EntityLink[]
+  eventLinks?: EntityEventLink[]
   tags: Tag[]
   canEdit: boolean
 }
@@ -30,6 +32,7 @@ type LinkableOption = {
 const EXTRA_LINKABLES: LinkableOption[] = [
   { type: 'arcs', label: 'Arco', labelPlural: 'Arcos', icon: GitBranch, accentClass: 'text-gold' },
   { type: 'sessions', label: 'Sessao', labelPlural: 'Sessoes', icon: Calendar, accentClass: 'text-sky-300' },
+  { type: 'events', label: 'Evento', labelPlural: 'Eventos', icon: BookMarked, accentClass: 'text-crimson-light' },
 ]
 
 const RELATION_SUGGESTIONS = [
@@ -56,12 +59,13 @@ function isEntityType(type: LinkableType): type is EntityType {
   return type in ENTITY_CONFIG
 }
 
-export function LinksPanel({ campaignId, entityType, entityId, links, tags, canEdit }: Props) {
+export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit }: Props) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ target_type: '' as LinkableType | '', target_id: '', relation_label: '' })
 
   const createLink = useCreateLink(campaignId)
   const deleteLink = useDeleteLink(campaignId)
+  const addEventLink = useAddEventLink(campaignId, form.target_type === 'events' ? form.target_id : '')
 
   const characters = useEntityList(campaignId, 'characters')
   const npcs = useEntityList(campaignId, 'npcs')
@@ -72,6 +76,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
   const notes = useEntityList(campaignId, 'notes')
   const arcs = useArcs(campaignId)
   const sessions = useCampaignSessions(campaignId)
+  const events = useEvents(campaignId)
 
   const lists: Partial<Record<LinkableType, any[]>> = {
     characters: characters.data ?? [],
@@ -83,6 +88,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
     notes: notes.data ?? [],
     arcs: arcs.data ?? [],
     sessions: sessions.data ?? [],
+    events: events.data ?? [],
   }
 
   const linkableOptions: LinkableOption[] = [
@@ -96,6 +102,16 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
 
   const submit = async () => {
     if (!form.target_type || !form.target_id) return
+    if (form.target_type === 'events') {
+      await addEventLink.mutateAsync({
+        entity_type: entityType,
+        entity_id: entityId,
+        role: form.relation_label || undefined,
+      })
+      setAdding(false)
+      setForm({ target_type: '', target_id: '', relation_label: '' })
+      return
+    }
     await createLink.mutateAsync({
       source_type: entityType,
       source_id: entityId,
@@ -118,6 +134,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
   const displayName = (type: LinkableType, item: any) => {
     if (isEntityType(type)) return ENTITY_CONFIG[type].displayName(item)
     if (type === 'arcs') return (item as Arc).title
+    if (type === 'events') return item.title
     if (type === 'sessions') {
       const session = item as Session & { arc_title?: string }
       return [session.title, session.arc_title].filter(Boolean).join(' - ')
@@ -127,6 +144,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
 
   const itemPath = (type: LinkableType, item: any, id: string) => {
     if (type === 'arcs') return `/campaigns/${campaignId}/arcs/${id}`
+    if (type === 'events') return `/campaigns/${campaignId}/chronicle`
     if (type === 'sessions') return `/campaigns/${campaignId}/arcs/${item?.arc_id}/sessions/${id}`
     return `/campaigns/${campaignId}/${type}/${id}`
   }
@@ -207,7 +225,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
           </div>
         )}
 
-        {links.length === 0 && !adding && (
+        {links.length === 0 && eventLinks.length === 0 && !adding && (
           <p className="text-xs text-parchment/25 italic">
             {entityType === 'sessions'
               ? 'Conecte locais, NPCs, personagens, notas e acontecimentos para montar o contexto vivo desta sessao.'
@@ -252,6 +270,28 @@ export function LinksPanel({ campaignId, entityType, entityId, links, tags, canE
               </div>
             )
           })}
+
+          {eventLinks.map(link => (
+            <div key={link.id} className="flex items-center gap-2 group">
+              <Link
+                to={`/campaigns/${campaignId}/chronicle`}
+                className="flex items-center gap-2 flex-1 bg-stone-200 hover:bg-stone-300 rounded px-2.5 py-2 transition-colors min-w-0"
+              >
+                <BookMarked size={13} className="shrink-0 text-crimson-light" />
+                <div className="min-w-0">
+                  <p className="text-xs text-parchment truncate">
+                    {link.role && (
+                      <span className="text-parchment/40 mr-1">{link.role} -</span>
+                    )}
+                    {link.event_title}
+                  </p>
+                  <p className="text-xs text-parchment/30">
+                    Evento{link.event_date_in_world ? ` - ${link.event_date_in_world}` : ''}
+                  </p>
+                </div>
+              </Link>
+            </div>
+          ))}
         </div>
       </div>
     </aside>

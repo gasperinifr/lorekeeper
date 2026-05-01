@@ -96,4 +96,43 @@ export async function ensureSchema(db) {
     )
   `)
   await db.query('CREATE INDEX IF NOT EXISTS idx_oracle_campaign ON oracle_messages(campaign_id, created_at)')
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      campaign_id     UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      session_id      UUID REFERENCES sessions(id) ON DELETE SET NULL,
+      arc_id          UUID REFERENCES arcs(id) ON DELETE SET NULL,
+      created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+      title           VARCHAR(255) NOT NULL,
+      type            VARCHAR(80)  NOT NULL DEFAULT 'outro',
+      impact          VARCHAR(30)  NOT NULL DEFAULT 'significativo',
+      date_in_world   VARCHAR(120),
+      description     TEXT,
+      visibility      VARCHAR(20)  DEFAULT 'public',
+      data            JSONB        DEFAULT '{}',
+      created_at      TIMESTAMPTZ  DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ  DEFAULT NOW()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS event_entity_links (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_id    UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id   UUID NOT NULL,
+      role        VARCHAR(100),
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(event_id, entity_type, entity_id)
+    )
+  `)
+
+  await db.query('CREATE INDEX IF NOT EXISTS idx_events_campaign    ON events(campaign_id)')
+  await db.query('CREATE INDEX IF NOT EXISTS idx_events_session     ON events(session_id)')
+  await db.query('CREATE INDEX IF NOT EXISTS idx_events_arc         ON events(arc_id)')
+  await db.query('CREATE INDEX IF NOT EXISTS idx_events_type_impact ON events(campaign_id, type, impact)')
+  await db.query('CREATE INDEX IF NOT EXISTS idx_eel_event          ON event_entity_links(event_id)')
+  await db.query('CREATE INDEX IF NOT EXISTS idx_eel_entity         ON event_entity_links(campaign_id, entity_type, entity_id)')
 }

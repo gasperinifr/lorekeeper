@@ -142,6 +142,7 @@ Responda SEMPRE em portugues brasileiro.
 Use o contexto da campanha como fonte principal. Se uma informacao nao estiver no contexto, diga isso claramente e ofereca uma inferencia util.
 Mantenha continuidade com o historico da conversa.
 Modo atual: ${mode === 'dm' ? 'DM. Voce pode mencionar segredos, notas privadas e bastidores.' : 'Jogador. Nao revele segredos, notas privadas, conteudo de DM ou informacoes marcadas como nao publicas.'}
+Sempre que citar uma entidade, evento, sessao, arco, local, nota, item, magia, criatura ou personagem listado em <citations>, escreva o nome exato com @ no inicio, por exemplo @Nome Citavel. Nao coloque @ em conceitos que nao estejam em <citations>.
 Seja direto, criativo e pratico para mesa de RPG.
 
 ${context}`

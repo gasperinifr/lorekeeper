@@ -1,10 +1,14 @@
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Send, Shield, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { useCampaign } from '@/hooks/useCampaign'
+import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
+import { useEntityList } from '@/hooks/useEntities'
+import { useEvents } from '@/hooks/useEvents'
 import { useClearOracleHistory, useOracleHistory, useSendOracleMessage } from '@/hooks/useOracle'
-import type { OracleMode } from '@/types'
+import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
+import type { EntityType, LinkableType, OracleMode } from '@/types'
 
 const SUGGESTIONS = [
   'Quem sao os aliados mais importantes da campanha?',
@@ -14,9 +18,101 @@ const SUGGESTIONS = [
   'Que segredos os jogadores ainda nao descobriram?',
 ]
 
+type CitationTarget = {
+  label: string
+  path: string
+  type: LinkableType
+}
+
+function citationPath(campaignId: string, type: LinkableType, item: any) {
+  if (type === 'arcs') return `/campaigns/${campaignId}/arcs/${item.id}`
+  if (type === 'sessions') return `/campaigns/${campaignId}/arcs/${item.arc_id}/sessions/${item.id}`
+  if (type === 'events') return `/campaigns/${campaignId}/chronicle`
+  return `/campaigns/${campaignId}/${type}/${item.id}`
+}
+
+function isBoundary(char: string | undefined) {
+  return !char || /[\s.,;:!?()[\]{}"'`]/.test(char)
+}
+
+function OracleMessageContent({ content, citations }: { content: string; citations: CitationTarget[] }) {
+  const sortedCitations = useMemo(
+    () => [...citations].sort((a, b) => b.label.length - a.label.length),
+    [citations]
+  )
+
+  const renderInline = (text: string, keyPrefix = 't'): ReactNode[] => {
+    const nodes: ReactNode[] = []
+    let i = 0
+
+    while (i < text.length) {
+      if (text.startsWith('**', i)) {
+        const end = text.indexOf('**', i + 2)
+        if (end !== -1) {
+          nodes.push(
+            <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-parchment">
+              {renderInline(text.slice(i + 2, end), `${keyPrefix}-b-${i}`)}
+            </strong>
+          )
+          i = end + 2
+          continue
+        }
+      }
+
+      if (text[i] === '@') {
+        const match = sortedCitations.find(citation => {
+          const token = `@${citation.label}`
+          return text.slice(i, i + token.length).toLocaleLowerCase('pt-BR') === token.toLocaleLowerCase('pt-BR') &&
+            isBoundary(text[i + token.length])
+        })
+
+        if (match) {
+          nodes.push(
+            <Link
+              key={`${keyPrefix}-m-${i}`}
+              to={match.path}
+              className="text-gold hover:text-gold-light underline decoration-gold/30 underline-offset-2 font-medium transition-colors"
+              title={`Abrir ${match.label}`}
+            >
+              @{match.label}
+            </Link>
+          )
+          i += match.label.length + 1
+          continue
+        }
+      }
+
+      const nextBold = text.indexOf('**', i)
+      const nextMention = text.indexOf('@', i + 1)
+      const nextStops = [nextBold, nextMention].filter(index => index !== -1)
+      const next = nextStops.length ? Math.min(...nextStops) : text.length
+      nodes.push(text.slice(i, next))
+      i = next
+    }
+
+    return nodes
+  }
+
+  return (
+    <p className="text-sm text-parchment/80 whitespace-pre-wrap leading-relaxed">
+      {renderInline(content)}
+    </p>
+  )
+}
+
 export function OraclePage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const { data: campaign } = useCampaign(campaignId!)
+  const characters = useEntityList(campaignId!, 'characters')
+  const npcs = useEntityList(campaignId!, 'npcs')
+  const locations = useEntityList(campaignId!, 'locations')
+  const items = useEntityList(campaignId!, 'items')
+  const spells = useEntityList(campaignId!, 'spells')
+  const creatures = useEntityList(campaignId!, 'creatures')
+  const notes = useEntityList(campaignId!, 'notes')
+  const arcs = useArcs(campaignId!)
+  const sessions = useCampaignSessions(campaignId!)
+  const events = useEvents(campaignId!)
   const [mode, setMode] = useState<OracleMode>('dm')
   const [message, setMessage] = useState('')
   const [pendingPrompt, setPendingPrompt] = useState('')
@@ -28,6 +124,45 @@ export function OraclePage() {
   const sendMessage = useSendOracleMessage(campaignId!, effectiveMode)
   const clearHistory = useClearOracleHistory(campaignId!, effectiveMode)
   const messages = data?.messages ?? []
+  const citations = useMemo<CitationTarget[]>(() => {
+    if (!campaignId) return []
+    const entityData: Record<EntityType, any[]> = {
+      characters: characters.data ?? [],
+      npcs: npcs.data ?? [],
+      locations: locations.data ?? [],
+      items: items.data ?? [],
+      spells: spells.data ?? [],
+      creatures: creatures.data ?? [],
+      notes: notes.data ?? [],
+    }
+
+    const entityCitations = ENTITY_TYPES.flatMap(type =>
+      (entityData[type] ?? []).map(item => ({
+        label: ENTITY_CONFIG[type].displayName(item),
+        path: citationPath(campaignId, type, item),
+        type,
+      }))
+    )
+
+    return [
+      ...entityCitations,
+      ...(arcs.data ?? []).map(arc => ({ label: arc.title, path: citationPath(campaignId, 'arcs', arc), type: 'arcs' as const })),
+      ...(sessions.data ?? []).map(session => ({ label: session.title, path: citationPath(campaignId, 'sessions', session), type: 'sessions' as const })),
+      ...(events.data ?? []).map(event => ({ label: event.title, path: citationPath(campaignId, 'events', event), type: 'events' as const })),
+    ].filter(citation => citation.label && citation.path)
+  }, [
+    campaignId,
+    arcs.data,
+    characters.data,
+    creatures.data,
+    events.data,
+    items.data,
+    locations.data,
+    notes.data,
+    npcs.data,
+    sessions.data,
+    spells.data,
+  ])
 
   useEffect(() => {
     if (!canUseDm) setMode('player')
@@ -123,7 +258,7 @@ export function OraclePage() {
               <div>
                 <h2 className="font-display text-2xl text-parchment">Pergunte ao Oracle</h2>
                 <p className="text-sm text-parchment/35 mt-1 max-w-xl">
-                  Ele usa NPCs, locais, arcos, sessoes, notas e itens da campanha para responder em contexto.
+                  Ele usa Eventos, NPCs, locais, arcos, sessoes, notas e itens da campanha para responder em contexto.
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2 max-w-3xl">
@@ -155,7 +290,7 @@ export function OraclePage() {
                     {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="text-sm text-parchment/80 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                <OracleMessageContent content={item.content} citations={citations} />
               </div>
             </article>
           ))}
@@ -165,7 +300,7 @@ export function OraclePage() {
               {pendingPrompt && (
                 <article className="flex justify-end">
                   <div className="max-w-[82%] rounded-lg px-4 py-3 shadow-sm border bg-gold/15 border-gold/20">
-                    <p className="text-sm text-parchment/80 whitespace-pre-wrap leading-relaxed">{pendingPrompt}</p>
+                    <OracleMessageContent content={pendingPrompt} citations={citations} />
                   </div>
                 </article>
               )}

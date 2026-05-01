@@ -15,6 +15,7 @@ import { ArcsPage }           from '@/pages/campaigns/ArcsPage'
 import { ArcDetailPage }      from '@/pages/campaigns/ArcDetailPage'
 import { SessionsPage }       from '@/pages/campaigns/SessionsPage'
 import { SessionDetailPage }  from '@/pages/campaigns/SessionDetailPage'
+import { ChroniclePage }      from '@/pages/campaigns/ChroniclePage'
 import { RelationshipGraphPage } from '@/pages/campaigns/RelationshipGraphPage'
 import { SearchPage }         from '@/pages/campaigns/SearchPage'
 import { TavernaPage }        from '@/pages/campaigns/TavernaPage'
@@ -97,18 +98,19 @@ export const router = createBrowserRouter([
       { path: '/campaigns/:campaignId/locations/:entityId', element: <EntityDetailPage entityTypeOverride="locations" /> },
       { path: '/campaigns/:campaignId/locations/:entityId/edit', element: <RequireEditor><EditLocationPage /></RequireEditor> },
 
-      // Entidades genéricas
-      { path: '/campaigns/:campaignId/:entityType',               element: <EntityListPage /> },
-      { path: '/campaigns/:campaignId/:entityType/new',           element: <RequireEditor><CreateEntityPage /></RequireEditor> },
-      { path: '/campaigns/:campaignId/:entityType/:entityId',     element: <EntityDetailPage /> },
-      { path: '/campaigns/:campaignId/:entityType/:entityId/edit',element: <RequireEditor><EditEntityPage /></RequireEditor> },
-
       // Narrativa
       { path: '/campaigns/:campaignId/arcs',                                        element: <ArcsPage /> },
       { path: '/campaigns/:campaignId/arcs/:arcId',                                 element: <ArcDetailPage /> },
       { path: '/campaigns/:campaignId/arcs/:arcId/sessions/:sessionId',             element: <SessionDetailPage /> },
       { path: '/campaigns/:campaignId/sessions',                                    element: <SessionsPage /> },
+      { path: '/campaigns/:campaignId/chronicle',                                   element: <ChroniclePage /> },
       { path: '/campaigns/:campaignId/relationships',                               element: <RelationshipGraphPage /> },
+
+      // Entidades genéricas
+      { path: '/campaigns/:campaignId/:entityType',               element: <EntityListPage /> },
+      { path: '/campaigns/:campaignId/:entityType/new',           element: <RequireEditor><CreateEntityPage /></RequireEditor> },
+      { path: '/campaigns/:campaignId/:entityType/:entityId',     element: <EntityDetailPage /> },
+      { path: '/campaigns/:campaignId/:entityType/:entityId/edit',element: <RequireEditor><EditEntityPage /></RequireEditor> },
 
       // Busca
       { path: '/campaigns/:campaignId/search', element: <SearchPage /> },

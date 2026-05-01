@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, ArrowLeft, Calendar, Clock, Lock } from 'lucide-react'
+import { Plus, ArrowLeft, Calendar, Clock, Lock, BookMarked } from 'lucide-react'
 import { useArcDetail, useCreateSession, useUpdateArc } from '@/hooks/useArcs'
+import { useEvents } from '@/hooks/useEvents'
 import { LinksPanel } from '@/components/entity/LinksPanel'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -11,6 +12,7 @@ import { clsx } from 'clsx'
 export function ArcDetailPage() {
   const { campaignId, arcId } = useParams<{ campaignId: string; arcId: string }>()
   const { data: arc, isLoading } = useArcDetail(campaignId!, arcId!)
+  const { data: events } = useEvents(campaignId!)
   const createSession = useCreateSession(campaignId!, arcId!)
   const updateArc = useUpdateArc(campaignId!, arcId!)
 
@@ -37,6 +39,10 @@ export function ArcDetailPage() {
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
   if (!arc) return <div className="p-8 text-crimson-light text-sm">Arco nao encontrado.</div>
   const canEdit = ['admin', 'editor'].includes((arc as any)._role)
+  const arcEvents = (events ?? []).filter(event =>
+    event.arc_id === arcId ||
+    event.entity_links.some(link => link.entity_type === 'arcs' && link.entity_id === arcId)
+  )
 
   return (
     <div className="p-8">
@@ -149,6 +155,28 @@ export function ArcDetailPage() {
                 </div>
               </Link>
             ))}
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-2 mb-4">
+              <BookMarked size={12} /> Eventos da crônica ({arcEvents.length})
+            </h2>
+            {arcEvents.length === 0 ? (
+              <p className="text-parchment/25 text-sm italic">Nenhum evento registrado para este arco.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {arcEvents.map(event => (
+                  <Link key={event.id} to={`/campaigns/${campaignId}/chronicle`}>
+                    <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl px-4 py-3 transition-colors">
+                      <p className="text-sm text-parchment font-medium">{event.title}</p>
+                      <p className="text-xs text-parchment/35 mt-0.5">
+                        {[event.impact, event.type, event.date_in_world].filter(Boolean).join(' - ')}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

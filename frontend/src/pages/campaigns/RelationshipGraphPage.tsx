@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Calendar, GitBranch, Link2 } from 'lucide-react'
+import { BookMarked, Calendar, GitBranch, Link2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
 import { useEntityList } from '@/hooks/useEntities'
 import { useAllLinks } from '@/hooks/useLinks'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
+import { useEvents } from '@/hooks/useEvents'
 import type { EntityLink, EntityType, LinkableType } from '@/types'
 
 declare global {
@@ -14,10 +15,12 @@ declare global {
   }
 }
 
+type GraphType = LinkableType | 'events'
+
 type GraphNode = {
   id: string
   entityId: string
-  type: LinkableType
+  type: GraphType
   label: string
   subtitle: string
   path: string
@@ -37,7 +40,7 @@ type GraphEdge = {
   label?: string
 }
 
-const TYPE_META: Partial<Record<LinkableType, {
+const TYPE_META: Partial<Record<GraphType, {
   label: string
   labelPlural: string
   icon: React.ElementType
@@ -56,9 +59,10 @@ const TYPE_META: Partial<Record<LinkableType, {
   })),
   arcs: { label: 'Arco', labelPlural: 'Arcos', icon: GitBranch, accentClass: 'text-gold', color: '#c9a227' },
   sessions: { label: 'Sessao', labelPlural: 'Sessoes', icon: Calendar, accentClass: 'text-sky-300', color: '#7dd3fc' },
+  events: { label: 'Evento', labelPlural: 'Eventos', icon: BookMarked, accentClass: 'text-crimson-light', color: '#f87171' },
 }
 
-const GRAPH_TYPES = [...ENTITY_TYPES, 'arcs', 'sessions'] as LinkableType[]
+const GRAPH_TYPES = [...ENTITY_TYPES, 'arcs', 'sessions', 'events'] as GraphType[]
 
 function accentToColor(accentClass: string) {
   const colors: Record<string, string> = {
@@ -73,31 +77,34 @@ function accentToColor(accentClass: string) {
   return colors[accentClass] ?? '#c9a227'
 }
 
-function isEntityType(type: LinkableType): type is EntityType {
+function isEntityType(type: GraphType): type is EntityType {
   return type in ENTITY_CONFIG
 }
 
-function displayName(type: LinkableType, item: any) {
+function displayName(type: GraphType, item: any) {
   if (isEntityType(type)) return ENTITY_CONFIG[type].displayName(item)
   if (type === 'arcs') return item.title
   if (type === 'sessions') return [item.title, item.arc_title].filter(Boolean).join(' - ')
+  if (type === 'events') return item.title
   return item.title ?? item.name ?? item.id
 }
 
-function displaySub(type: LinkableType, item: any) {
+function displaySub(type: GraphType, item: any) {
   if (isEntityType(type)) return ENTITY_CONFIG[type].displaySub(item)
   if (type === 'arcs') return item.status ?? ''
   if (type === 'sessions') return item.played_at ? new Date(item.played_at).toLocaleDateString('pt-BR') : item.status ?? ''
+  if (type === 'events') return [item.impact, item.type].filter(Boolean).join(' - ')
   return ''
 }
 
-function itemPath(campaignId: string, type: LinkableType, item: any, id: string) {
+function itemPath(campaignId: string, type: GraphType, item: any, id: string) {
   if (type === 'arcs') return `/campaigns/${campaignId}/arcs/${id}`
   if (type === 'sessions') return `/campaigns/${campaignId}/arcs/${item?.arc_id}/sessions/${id}`
+  if (type === 'events') return `/campaigns/${campaignId}/chronicle`
   return `/campaigns/${campaignId}/${type}/${id}`
 }
 
-function nodeKey(type: LinkableType, id: string) {
+function nodeKey(type: GraphType, id: string) {
   return `${type}:${id}`
 }
 
@@ -105,7 +112,7 @@ export function RelationshipGraphPage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const svgRef = useRef<SVGSVGElement>(null)
-  const [enabledTypes, setEnabledTypes] = useState<LinkableType[]>(GRAPH_TYPES)
+  const [enabledTypes, setEnabledTypes] = useState<GraphType[]>(GRAPH_TYPES)
   const [size, setSize] = useState({ width: 960, height: 620 })
   const [version, setVersion] = useState(0)
 
@@ -118,16 +125,17 @@ export function RelationshipGraphPage() {
   const notes = useEntityList(campaignId!, 'notes')
   const arcs = useArcs(campaignId!)
   const sessions = useCampaignSessions(campaignId!)
+  const events = useEvents(campaignId!)
   const links = useAllLinks(campaignId!)
 
   const isLoading = [
-    characters, npcs, locations, items, spells, creatures, notes, arcs, sessions, links,
+    characters, npcs, locations, items, spells, creatures, notes, arcs, sessions, events, links,
   ].some(query => query.isLoading)
 
   const { nodes, edges } = useMemo(() => {
     const active = new Set(enabledTypes)
     const allNodes = new Map<string, GraphNode>()
-    const lists: Partial<Record<LinkableType, any[]>> = {
+    const lists: Partial<Record<GraphType, any[]>> = {
       characters: characters.data ?? [],
       npcs: npcs.data ?? [],
       locations: locations.data ?? [],
@@ -137,6 +145,7 @@ export function RelationshipGraphPage() {
       notes: notes.data ?? [],
       arcs: arcs.data ?? [],
       sessions: sessions.data ?? [],
+      events: events.data ?? [],
     }
 
     GRAPH_TYPES.forEach(type => {
@@ -159,14 +168,43 @@ export function RelationshipGraphPage() {
       })
     })
 
-    const graphEdges = (links.data ?? [])
-      .filter((link: EntityLink) => active.has(link.source_type) && active.has(link.target_type))
-      .map((link: EntityLink) => ({
-        id: link.id,
-        source: nodeKey(link.source_type, link.source_id),
-        target: nodeKey(link.target_type, link.target_id),
-        label: link.relation_label,
-      }))
+    const graphEdges = [
+      ...(links.data ?? [])
+        .filter((link: EntityLink) => active.has(link.source_type) && active.has(link.target_type))
+        .map((link: EntityLink) => ({
+          id: link.id,
+          source: nodeKey(link.source_type, link.source_id),
+          target: nodeKey(link.target_type, link.target_id),
+          label: link.relation_label,
+        })),
+      ...(events.data ?? []).flatMap(event => {
+        const eventEdges = event.entity_links
+          .filter(link => active.has('events') && active.has(link.entity_type))
+          .map(link => ({
+            id: `event-link:${link.id}`,
+            source: nodeKey('events', event.id),
+            target: nodeKey(link.entity_type, link.entity_id),
+            label: link.role,
+          }))
+        if (event.arc_id && active.has('events') && active.has('arcs')) {
+          eventEdges.push({
+            id: `event-arc:${event.id}`,
+            source: nodeKey('events', event.id),
+            target: nodeKey('arcs', event.arc_id),
+            label: 'arco',
+          })
+        }
+        if (event.session_id && active.has('events') && active.has('sessions')) {
+          eventEdges.push({
+            id: `event-session:${event.id}`,
+            source: nodeKey('events', event.id),
+            target: nodeKey('sessions', event.session_id),
+            label: 'sessao',
+          })
+        }
+        return eventEdges
+      }),
+    ]
       .filter(edge => allNodes.has(edge.source) && allNodes.has(edge.target))
 
     const connected = new Set<string>()
@@ -192,6 +230,7 @@ export function RelationshipGraphPage() {
     notes.data,
     arcs.data,
     sessions.data,
+    events.data,
   ])
 
   useEffect(() => {
@@ -263,7 +302,7 @@ export function RelationshipGraphPage() {
     return () => simulation.stop()
   }, [edges, nodes, size.height, size.width])
 
-  const toggleType = (type: LinkableType) => {
+  const toggleType = (type: GraphType) => {
     setEnabledTypes(current =>
       current.includes(type)
         ? current.filter(entry => entry !== type)

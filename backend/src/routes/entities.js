@@ -208,14 +208,25 @@ export async function entityRoutes(fastify) {
 
     fastify.get(`${base}/:id`, { preHandler: requireCampaignAccess }, async (req, reply) => {
       const access = buildAudienceFilter(cfg, req, 3)
-      const [e, l, t] = await Promise.all([
+      const canSeePrivateEvents = ['admin', 'editor'].includes(req.campaignRole)
+      const eventVisibility = canSeePrivateEvents ? '' : "AND e.visibility='public'"
+      const [e, l, t, ev] = await Promise.all([
         db.query(`SELECT * FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`, [req.params.id, req.params.campaignId, ...access.vals]),
         db.query(`SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type=$2 AND source_id=$3) OR (target_type=$2 AND target_id=$3))`, [req.params.campaignId, entityType, req.params.id]),
         db.query(`SELECT t.id,t.name,t.color FROM tags t JOIN entity_tags et ON et.tag_id=t.id WHERE et.entity_type=$1 AND et.entity_id=$2`, [entityType, req.params.id]),
+        db.query(
+          `SELECT eel.*, e.title AS event_title, e.type AS event_type, e.impact AS event_impact,
+                  e.date_in_world AS event_date_in_world, e.visibility AS event_visibility
+           FROM event_entity_links eel
+           JOIN events e ON e.id=eel.event_id
+           WHERE eel.campaign_id=$1 AND eel.entity_type=$2 AND eel.entity_id=$3 ${eventVisibility}
+           ORDER BY e.created_at DESC`,
+          [req.params.campaignId, entityType, req.params.id]
+        ),
       ])
       if (!e.rows.length) return reply.status(404).send({ error: 'Entidade nao encontrada.' })
       const links = await filterVisibleLinks(db, req, entityType, req.params.id, l.rows)
-      return reply.send({ ...e.rows[0], links, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole })
+      return reply.send({ ...e.rows[0], links, event_links: ev.rows, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole })
     })
 
     fastify.patch(`${base}/:id`, { preHandler: requireEditor }, async (req, reply) => {

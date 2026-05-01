@@ -588,7 +588,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
           <div className="flex flex-col gap-1">
             <label className="text-sm text-parchment/70 font-medium">
               Como encontrar
-              <span className="text-parchment/30 font-normal ml-2 text-xs">Informação adicional gerada por IA</span>
+              <span className="text-parchment/30 font-normal ml-2 text-xs"></span>
             </label>
             <textarea
               value={form.data?.hook ?? ''}

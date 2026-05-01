@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Sword, CheckCircle, Clock, Calendar, Lock, GitBranch } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Plus, Sword, CheckCircle, Clock, Calendar, Lock, GitBranch, BookMarked } from 'lucide-react'
 import { useSessionDetail, useUpdateSession, useCreateEncounter, useUpdateEncounter } from '@/hooks/useSessions'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useEntityList } from '@/hooks/useEntities'
+import { useEvents } from '@/hooks/useEvents'
 import { LinksPanel } from '@/components/entity/LinksPanel'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { Button } from '@/components/ui/Button'
@@ -109,8 +110,10 @@ export function SessionDetailPage() {
   const { campaignId, arcId, sessionId } = useParams<{
     campaignId: string; arcId: string; sessionId: string
   }>()
+  const navigate = useNavigate()
 
   const { data: session, isLoading } = useSessionDetail(campaignId!, arcId!, sessionId!)
+  const { data: events } = useEvents(campaignId!)
   const updateSession  = useUpdateSession(campaignId!, arcId!, sessionId!)
   const createEncounter = useCreateEncounter(campaignId!, arcId!, sessionId!)
 
@@ -169,6 +172,10 @@ export function SessionDetailPage() {
   if (!session) return <div className="p-8 text-crimson-light text-sm">Sessão não encontrada.</div>
 
   const canEdit = ['admin', 'editor'].includes(session._role)
+  const sessionEvents = (events ?? []).filter(event =>
+    event.session_id === sessionId ||
+    event.entity_links.some(link => link.entity_type === 'sessions' && link.entity_id === sessionId)
+  )
 
   return (
     <>
@@ -223,6 +230,13 @@ export function SessionDetailPage() {
                     <option value="public">Pública</option>
                     <option value="private">Privada</option>
                   </select>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate(`/campaigns/${campaignId}/chronicle`, { state: { session_id: sessionId } })}
+                  >
+                    <BookMarked size={13} /> Registrar evento
+                  </Button>
                   {session.status !== 'completed' ? (
                     <Button
                       size="sm"
@@ -322,6 +336,39 @@ export function SessionDetailPage() {
             sessionId={sessionId!}
             links={session.links ?? []}
           />
+
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-1.5">
+                <BookMarked size={11} /> Eventos da crônica ({sessionEvents.length})
+              </h2>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => navigate(`/campaigns/${campaignId}/chronicle`, { state: { session_id: sessionId } })}
+                >
+                  <Plus size={13} /> Registrar
+                </Button>
+              )}
+            </div>
+            {sessionEvents.length === 0 ? (
+              <p className="text-parchment/25 text-sm italic">Nenhum evento registrado para esta sessão.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {sessionEvents.map(event => (
+                  <Link key={event.id} to={`/campaigns/${campaignId}/chronicle`}>
+                    <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-lg px-4 py-3 transition-colors">
+                      <p className="text-sm text-parchment font-medium truncate">{event.title}</p>
+                      <p className="text-xs text-parchment/35 mt-0.5">
+                        {[event.impact, event.type, event.date_in_world].filter(Boolean).join(' - ')}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
 
           {/* Encontros */}
           <div>
