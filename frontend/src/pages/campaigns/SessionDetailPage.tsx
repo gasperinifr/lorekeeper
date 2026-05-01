@@ -8,6 +8,7 @@ import { LinksPanel } from '@/components/entity/LinksPanel'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt'
 import type { EntityLink, EntityType, LinkableType } from '@/types'
 import { clsx } from 'clsx'
 
@@ -138,6 +139,25 @@ export function SessionDetailPage() {
     setEditingSummary(false)
   }
 
+  const savePendingSessionEdits = async () => {
+    const payload: Record<string, string> = {}
+    if (editingSummary && summary !== (session?.summary ?? '')) payload.summary = summary
+    if (editingNotes && dmNotes !== (session?.dm_notes ?? '')) payload.dm_notes = dmNotes
+    if (Object.keys(payload).length) await updateSession.mutateAsync(payload)
+    setEditingSummary(false)
+    setEditingNotes(false)
+  }
+
+  const hasUnsavedSessionEdits =
+    (editingSummary && summary !== (session?.summary ?? '')) ||
+    (editingNotes && dmNotes !== (session?.dm_notes ?? ''))
+
+  const { dialog: unsavedDialog } = useUnsavedChangesPrompt({
+    when: hasUnsavedSessionEdits && !updateSession.isPending,
+    onSave: savePendingSessionEdits,
+    saving: updateSession.isPending,
+  })
+
   const submitEncounter = async () => {
     if (!encForm.title) return
     await createEncounter.mutateAsync(encForm)
@@ -151,6 +171,8 @@ export function SessionDetailPage() {
   const canEdit = ['admin', 'editor'].includes(session._role)
 
   return (
+    <>
+    {unsavedDialog}
     <div className="p-8">
       {/* Breadcrumb */}
       <Link
@@ -201,13 +223,21 @@ export function SessionDetailPage() {
                     <option value="public">Pública</option>
                     <option value="private">Privada</option>
                   </select>
-                  {session.status !== 'completed' && (
+                  {session.status !== 'completed' ? (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => updateSession.mutateAsync({ status: 'completed' })}
                     >
                       <CheckCircle size={13} /> Marcar concluída
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => updateSession.mutateAsync({ status: 'planned' })}
+                    >
+                      <CheckCircle size={13} /> Desmarcar concluída
                     </Button>
                   )}
                 </div>
@@ -377,6 +407,7 @@ export function SessionDetailPage() {
         />
       </div>
     </div>
+    </>
   )
 }
 

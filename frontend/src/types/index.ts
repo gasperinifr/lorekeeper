@@ -93,6 +93,19 @@ export interface ChatMessage {
   created_at: string
 }
 
+export type OracleMode = 'dm' | 'player'
+
+export interface OracleMessage {
+  id: string
+  campaign_id: string
+  user_id?: string | null
+  username?: string
+  role: 'user' | 'assistant'
+  content: string
+  mode: OracleMode
+  created_at: string
+}
+
 export interface Tag {
   id: string
   name: string

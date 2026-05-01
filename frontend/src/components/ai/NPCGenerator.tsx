@@ -82,6 +82,7 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
       name: result.name, race: result.race, role: result.role,
       description: result.description, personality: result.personality,
       secrets: result.secrets,
+      data: result.hook ? { hook: result.hook } : {},
       visibility,
     })
     onCreated?.(saved)

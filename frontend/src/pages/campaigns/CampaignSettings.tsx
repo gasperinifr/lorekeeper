@@ -1,10 +1,11 @@
-import { useState, FormEvent } from 'react'
+import { useEffect, useState, FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Copy, Mail, Trash2, UserPlus } from 'lucide-react'
 import { useCampaign, useUpdateCampaign, useCreateInvite, useUpdateMember } from '@/hooks/useCampaign'
 import { Input } from '@/components/ui/Input'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
+import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt'
 import { api } from '@/api/client'
 import { clsx } from 'clsx'
 
@@ -18,6 +19,8 @@ type InviteResult = {
 
 const roleLabels: Record<string, string> = { viewer: 'Viewer', editor: 'Editor', admin: 'Admin' }
 const playRoleLabels: Record<string, string> = { player: 'Jogador', gm: 'Mestre' }
+const editableCampaignKeys = ['title', 'cover_image_url', 'description', 'status', 'visibility']
+const serializeSettings = (value: unknown) => JSON.stringify(value ?? null)
 
 export function CampaignSettings() {
   const { campaignId } = useParams<{ campaignId: string }>()
@@ -34,20 +37,39 @@ export function CampaignSettings() {
   const [inviteError, setInviteError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedSnapshot, setSavedSnapshot] = useState('')
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const val = (k: string) => form[k] ?? (campaign as any)?.[k] ?? ''
+  const currentSettings = Object.fromEntries(editableCampaignKeys.map(key => [key, val(key)]))
+
+  useEffect(() => {
+    if (campaign && !savedSnapshot) setSavedSnapshot(serializeSettings(currentSettings))
+  }, [campaign, currentSettings, savedSnapshot])
+
+  const saveSettings = async () => {
+    await updateCampaign.mutateAsync(form)
+    setSavedSnapshot(serializeSettings(currentSettings))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  const hasUnsavedChanges = !!campaign && !!savedSnapshot && serializeSettings(currentSettings) !== savedSnapshot
+  const { dialog: unsavedDialog } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !updateCampaign.isPending,
+    onSave: saveSettings,
+    saving: updateCampaign.isPending,
+  })
 
   if (isLoading || !campaign) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
 
   const canAdmin = campaign.role === 'admin'
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }))
-
-  const val = (k: string) => form[k] ?? (campaign as any)[k] ?? ''
 
   const onSave = async (e: FormEvent) => {
     e.preventDefault()
-    await updateCampaign.mutateAsync(form)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    await saveSettings()
   }
 
   const buildInviteEmailHref = (email: string, code: string) =>
@@ -130,6 +152,8 @@ export function CampaignSettings() {
   )
 
   return (
+    <>
+    {unsavedDialog}
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="font-display text-2xl text-parchment mb-8">Configuracoes da campanha</h1>
 
@@ -293,5 +317,6 @@ export function CampaignSettings() {
         </div>
       </section>
     </div>
+    </>
   )
 }

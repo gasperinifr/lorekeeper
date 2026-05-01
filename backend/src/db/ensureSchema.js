@@ -83,4 +83,17 @@ export async function ensureSchema(db) {
     )
   `)
   await db.query('CREATE INDEX IF NOT EXISTS idx_chat_campaign ON chat_messages(campaign_id, created_at)')
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS oracle_messages (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+      role        VARCHAR(10) NOT NULL,
+      content     TEXT NOT NULL,
+      mode        VARCHAR(10) DEFAULT 'dm',
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await db.query('CREATE INDEX IF NOT EXISTS idx_oracle_campaign ON oracle_messages(campaign_id, created_at)')
 }

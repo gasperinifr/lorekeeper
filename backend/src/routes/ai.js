@@ -1,5 +1,5 @@
-import { requireEditor } from '../middleware/authenticate.js'
-import { complete } from '../lib/ai.js'
+import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import { complete, completeMessages, getCampaignContextFull } from '../lib/ai.js'
 
 export async function aiRoutes(fastify) {
   const { db } = fastify
@@ -127,5 +127,93 @@ Retorne JSON:
       700
     )
     return reply.send({ expanded: text })
+  })
+
+  function oracleMode(req) {
+    const requested = req.body?.mode ?? req.query?.mode
+    const wantsDm = requested === 'dm'
+    const canDm = ['admin', 'editor'].includes(req.campaignRole)
+    return wantsDm && canDm ? 'dm' : 'player'
+  }
+
+  function oracleSystemPrompt(context, mode) {
+    return `Voce e o Oracle do Lorekeeper: um assistente narrativo persistente que conhece a campanha abaixo.
+Responda SEMPRE em portugues brasileiro.
+Use o contexto da campanha como fonte principal. Se uma informacao nao estiver no contexto, diga isso claramente e ofereca uma inferencia util.
+Mantenha continuidade com o historico da conversa.
+Modo atual: ${mode === 'dm' ? 'DM. Voce pode mencionar segredos, notas privadas e bastidores.' : 'Jogador. Nao revele segredos, notas privadas, conteudo de DM ou informacoes marcadas como nao publicas.'}
+Seja direto, criativo e pratico para mesa de RPG.
+
+${context}`
+  }
+
+  fastify.get('/campaigns/:campaignId/ai/oracle', { preHandler: requireCampaignAccess }, async (req, reply) => {
+    const mode = oracleMode(req)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 80, 1), 200)
+    const { rows } = await db.query(
+      `SELECT om.*, u.username
+       FROM oracle_messages om
+       LEFT JOIN users u ON u.id=om.user_id
+       WHERE om.campaign_id=$1 AND om.mode=$2
+       ORDER BY om.created_at ASC
+       LIMIT $3`,
+      [req.params.campaignId, mode, limit]
+    )
+    return reply.send({ mode, messages: rows })
+  })
+
+  fastify.post('/campaigns/:campaignId/ai/oracle', { preHandler: requireCampaignAccess }, async (req, reply) => {
+    try {
+      const message = String(req.body.message ?? '').trim()
+      if (!message) return reply.status(400).send({ error: 'Mensagem obrigatoria.' })
+
+      const mode = oracleMode(req)
+      const [{ rows: history }, context] = await Promise.all([
+        db.query(
+          `SELECT role,content FROM (
+             SELECT role,content,created_at FROM oracle_messages
+             WHERE campaign_id=$1 AND mode=$2
+             ORDER BY created_at DESC
+             LIMIT 20
+           ) recent ORDER BY created_at ASC`,
+          [req.params.campaignId, mode]
+        ),
+        getCampaignContextFull(db, req.params.campaignId, mode),
+      ])
+
+      const messages = [
+        ...history.map(row => ({ role: row.role, content: row.content })),
+        { role: 'user', content: message },
+      ]
+      const answer = await completeMessages(oracleSystemPrompt(context, mode), messages, 1300)
+
+      const { rows } = await db.query(
+        `WITH user_message AS (
+           INSERT INTO oracle_messages (campaign_id,user_id,role,content,mode)
+           VALUES ($1,$2,'user',$3,$5)
+           RETURNING *
+         ), assistant_message AS (
+           INSERT INTO oracle_messages (campaign_id,user_id,role,content,mode)
+           VALUES ($1,NULL,'assistant',$4,$5)
+           RETURNING *
+         )
+         SELECT * FROM user_message
+         UNION ALL
+         SELECT * FROM assistant_message
+         ORDER BY created_at ASC`,
+        [req.params.campaignId, req.user.id, message, answer, mode]
+      )
+
+      return reply.status(201).send({ mode, answer, messages: rows })
+    } catch (err) {
+      req.log.error({ err }, 'Falha ao conversar com Oracle')
+      return reply.status(500).send({ error: aiErrorMessage(err) })
+    }
+  })
+
+  fastify.delete('/campaigns/:campaignId/ai/oracle', { preHandler: requireEditor }, async (req, reply) => {
+    const mode = oracleMode(req)
+    await db.query('DELETE FROM oracle_messages WHERE campaign_id=$1 AND mode=$2', [req.params.campaignId, mode])
+    return reply.status(204).send()
   })
 }

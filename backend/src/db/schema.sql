@@ -260,6 +260,16 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS oracle_messages (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  role        VARCHAR(10) NOT NULL,
+  content     TEXT NOT NULL,
+  mode        VARCHAR(10) DEFAULT 'dm',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_campaigns_owner     ON campaigns(owner_id);
 CREATE INDEX IF NOT EXISTS idx_members_campaign    ON campaign_members(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_members_user        ON campaign_members(user_id);
@@ -279,3 +289,4 @@ CREATE INDEX IF NOT EXISTS idx_entity_links_source ON entity_links(source_type, 
 CREATE INDEX IF NOT EXISTS idx_entity_links_target ON entity_links(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_entity_tags_entity  ON entity_tags(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_chat_campaign       ON chat_messages(campaign_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_oracle_campaign     ON oracle_messages(campaign_id, created_at);

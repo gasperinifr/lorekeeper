@@ -13,7 +13,36 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { EntityType } from '@/types'
 
 // Renderiza markdown simples (quebras de linha → <br>)
+function looksLikeHtml(value: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(value)
+}
+
+function sanitizeHtml(value: string) {
+  const template = document.createElement('template')
+  template.innerHTML = value
+  template.content.querySelectorAll('script,style,iframe,object,embed').forEach(node => node.remove())
+  template.content.querySelectorAll('*').forEach(node => {
+    ;[...node.attributes].forEach(attr => {
+      const name = attr.name.toLowerCase()
+      const content = attr.value.toLowerCase()
+      if (name.startsWith('on') || content.startsWith('javascript:')) {
+        node.removeAttribute(attr.name)
+      }
+    })
+  })
+  return template.innerHTML
+}
+
 function Prose({ text }: { text: string }) {
+  if (looksLikeHtml(text)) {
+    return (
+      <div
+        className="lk-rich-content text-sm text-parchment/70 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(text) }}
+      />
+    )
+  }
+
   return (
     <p className="text-sm text-parchment/70 leading-relaxed whitespace-pre-wrap">{text}</p>
   )
@@ -65,6 +94,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
     !(hasStructuredBlock && structuredMeta.includes(f.key))
   )
   const imageUrl = entity.image_url ?? entity.portrait_url
+  const imageKey = entity.image_url ? 'image_url' : entity.portrait_url ? 'portrait_url' : null
 
   return (
     <div className="p-8">
@@ -116,12 +146,21 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
           )}
 
           {imageUrl && !hasStructuredBlock && (
-            <img
-              src={imageUrl}
-              alt={cfg.displayName(entity)}
-              className="w-full max-h-[28rem] object-contain rounded-lg border border-stone-300 bg-stone-200 mb-6"
-              onError={e => { e.currentTarget.style.display = 'none' }}
-            />
+            imageKey === 'portrait_url' ? (
+              <img
+                src={imageUrl}
+                alt={cfg.displayName(entity)}
+                className="mx-auto max-h-[20rem] w-auto object-contain rounded-lg border border-stone-300 bg-stone-200 mb-6"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            ) : (
+              <img
+                src={imageUrl}
+                alt={cfg.displayName(entity)}
+                className="w-full max-h-[20rem] object-cover rounded-lg border border-stone-300 bg-stone-200 mb-6"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            )
           )}
 
           {/* Metadados em linha */}
@@ -173,6 +212,14 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
                   🔒 {secretsField.label}
                 </h3>
                 <Prose text={entity.secrets} />
+              </div>
+            )}
+
+            {/* Como encontrar (NPCs) */}
+            {entityType === 'npcs' && entity.data?.hook && (
+              <div>
+                <h3 className="text-xs text-parchment/30 uppercase tracking-widest mb-2">Como encontrar</h3>
+                <Prose text={entity.data.hook} />
               </div>
             )}
           </div>

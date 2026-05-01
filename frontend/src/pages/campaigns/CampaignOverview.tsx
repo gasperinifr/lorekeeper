@@ -71,7 +71,7 @@ export function CampaignOverview() {
       <div className="mb-10">
         {campaign.cover_image_url && (
           <div className="max-h-80 rounded-xl overflow-hidden mb-6 bg-stone-100 border border-stone-300 flex justify-center">
-            <img src={campaign.cover_image_url} alt={campaign.title} className="max-h-80 w-auto max-w-full object-contain" />
+            <img src={campaign.cover_image_url} alt={campaign.title} className="max-h-80 w-full object-cover" />
           </div>
         )}
         <div className="flex items-start justify-between gap-4">

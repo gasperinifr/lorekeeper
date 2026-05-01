@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import {
   BookOpen, Map, Users, Sword, Package, Scroll,
   GitBranch, Calendar, Search, Settings, ChevronLeft,
-  Skull, Home, LogOut, MessageSquare,
+  Skull, Home, LogOut, MessageSquare, Network, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCampaign } from '@/hooks/useCampaign'
@@ -75,6 +75,8 @@ export function Sidebar() {
 
             <NavItem to={`/campaigns/${campaignId}/search`} icon={Search} label="Buscar" />
             <NavItem to={`/campaigns/${campaignId}/taverna`} icon={MessageSquare} label="Taverna" />
+            <NavItem to={`/campaigns/${campaignId}/oracle`} icon={Sparkles} label="Oracle" />
+            <NavItem to={`/campaigns/${campaignId}/relationships`} icon={Network} label="Relações" />
 
             <div className="mt-3 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
               Mundo

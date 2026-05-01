@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react'
+import { useMemo, useState, FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, GitBranch, Link2, Plus, Trash2, X } from 'lucide-react'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -9,6 +9,8 @@ import { useCampaign } from '@/hooks/useCampaign'
 import { Input } from '@/components/ui/Input'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
+import { RichTextEditor } from '@/components/entity/RichTextEditor'
+import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt'
 import type { EntityType, LinkableType } from '@/types'
 import { clsx } from 'clsx'
 
@@ -26,6 +28,8 @@ const visibilityLabels: Record<string, string> = {
   gm: 'Mestre e admins',
   user: 'Usuario unico',
 }
+
+const serializeForm = (value: unknown) => JSON.stringify(value ?? null)
 
 function SmallField({ label, value, onChange, type = 'text' }: {
   label: string
@@ -344,13 +348,16 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const [searchParams] = useSearchParams()
   const isEdit = !!entityId
   const initialParentId = type === 'locations' ? searchParams.get('parentId') ?? '' : ''
-
-  const [form, setForm] = useState<Record<string, any>>(
-    initial ?? {
+  const initialForm = useMemo(
+    () => initial ?? {
       ...Object.fromEntries(cfg.fields.map(f => [f.key, f.key === 'visibility' ? 'public' : f.type === 'toggle' ? true : ''])),
       ...(type === 'locations' && initialParentId ? { parent_id: initialParentId } : {}),
-    }
+    },
+    [cfg.fields, initial, initialParentId, type]
   )
+
+  const [form, setForm] = useState<Record<string, any>>(initialForm)
+  const [savedSnapshot, setSavedSnapshot] = useState(() => serializeForm({ form: initialForm, pendingConnections: [] }))
   const [error, setError] = useState('')
   const [pendingConnections, setPendingConnections] = useState<PendingConnection[]>([])
 
@@ -392,30 +399,42 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     return payload
   }
 
+  const saveEntity = async () => {
+    setError('')
+    const payload = buildPayload()
+    const result = isEdit
+      ? await update.mutateAsync(payload)
+      : await create.mutateAsync(payload)
+    if (!isEdit && pendingConnections.length) {
+      await Promise.all(pendingConnections.map(link => createLink.mutateAsync({
+        source_type: type,
+        source_id: result.id,
+        target_type: link.target_type,
+        target_id: link.target_id,
+        relation_label: link.relation_label,
+      })))
+    }
+    setSavedSnapshot(serializeForm({ form, pendingConnections }))
+    return result
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     try {
-      const payload = buildPayload()
-      const result = isEdit
-        ? await update.mutateAsync(payload)
-        : await create.mutateAsync(payload)
-      if (!isEdit && pendingConnections.length) {
-        await Promise.all(pendingConnections.map(link => createLink.mutateAsync({
-          source_type: type,
-          source_id: result.id,
-          target_type: link.target_type,
-          target_id: link.target_id,
-          relation_label: link.relation_label,
-        })))
-      }
-      navigate(`/campaigns/${campaignId}/${type}/${result.id}`)
+      const result = await saveEntity()
+      runWithoutPrompt(() => navigate(`/campaigns/${campaignId}/${type}/${result.id}`))
     } catch (err: any) {
       setError(err.message)
     }
   }
 
   const isPending = create.isPending || update.isPending
+  const hasUnsavedChanges = serializeForm({ form, pendingConnections }) !== savedSnapshot
+  const { dialog: unsavedDialog, runWithoutPrompt } = useUnsavedChangesPrompt({
+    when: hasUnsavedChanges && !isPending,
+    onSave: saveEntity,
+    saving: isPending,
+  })
   const imageField = cfg.fields.find(field => field.key === 'image_url' || field.key === 'portrait_url')
   const parentOptions = locations.filter((location: any) => location.id !== entityId)
   const parentLocationField = type === 'locations' ? (
@@ -436,6 +455,8 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   ) : null
 
   return (
+    <>
+    {unsavedDialog}
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <cfg.icon size={20} className={cfg.accentClass} />
@@ -468,13 +489,21 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
                 {field.label}
                 {field.hint && <span className="text-parchment/30 font-normal ml-2 text-xs">{field.hint}</span>}
               </label>
-              <textarea
-                value={form[field.key] ?? ''}
-                onChange={e => set(field.key, e.target.value)}
-                rows={field.rows ?? 4}
-                placeholder={field.placeholder}
-                className={clsx(inputClass, 'resize-y')}
-              />
+              {type === 'notes' && field.key === 'content' ? (
+                <RichTextEditor
+                  campaignId={campaignId}
+                  value={form[field.key] ?? ''}
+                  onChange={value => set(field.key, value)}
+                />
+              ) : (
+                <textarea
+                  value={form[field.key] ?? ''}
+                  onChange={e => set(field.key, e.target.value)}
+                  rows={field.rows ?? 4}
+                  placeholder={field.placeholder}
+                  className={clsx(inputClass, 'resize-y')}
+                />
+              )}
             </div>
           )
 
@@ -555,6 +584,22 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
 
         <Structured5eEditor type={type} data={form.data ?? {}} setData={setData} />
 
+        {type === 'npcs' && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-parchment/70 font-medium">
+              Como encontrar
+              <span className="text-parchment/30 font-normal ml-2 text-xs">Informação adicional gerada por IA</span>
+            </label>
+            <textarea
+              value={form.data?.hook ?? ''}
+              onChange={e => setData('hook', e.target.value)}
+              rows={3}
+              placeholder="Onde e como o grupo pode encontrar ou conhecer este NPC..."
+              className={clsx(inputClass, 'resize-y')}
+            />
+          </div>
+        )}
+
         {!isEdit && (
           <PendingConnectionsEditor
             campaignId={campaignId}
@@ -573,5 +618,6 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
         </div>
       </form>
     </div>
+    </>
   )
 }

@@ -15,8 +15,10 @@ import { ArcsPage }           from '@/pages/campaigns/ArcsPage'
 import { ArcDetailPage }      from '@/pages/campaigns/ArcDetailPage'
 import { SessionsPage }       from '@/pages/campaigns/SessionsPage'
 import { SessionDetailPage }  from '@/pages/campaigns/SessionDetailPage'
+import { RelationshipGraphPage } from '@/pages/campaigns/RelationshipGraphPage'
 import { SearchPage }         from '@/pages/campaigns/SearchPage'
 import { TavernaPage }        from '@/pages/campaigns/TavernaPage'
+import { OraclePage }         from '@/pages/campaigns/OraclePage'
 import { useCampaign }        from '@/hooks/useCampaign'
 import { useEntityDetail }    from '@/hooks/useEntities'
 import type { EntityType }    from '@/types'  
@@ -106,10 +108,12 @@ export const router = createBrowserRouter([
       { path: '/campaigns/:campaignId/arcs/:arcId',                                 element: <ArcDetailPage /> },
       { path: '/campaigns/:campaignId/arcs/:arcId/sessions/:sessionId',             element: <SessionDetailPage /> },
       { path: '/campaigns/:campaignId/sessions',                                    element: <SessionsPage /> },
+      { path: '/campaigns/:campaignId/relationships',                               element: <RelationshipGraphPage /> },
 
       // Busca
       { path: '/campaigns/:campaignId/search', element: <SearchPage /> },
       { path: '/campaigns/:campaignId/taverna', element: <TavernaPage /> },
+      { path: '/campaigns/:campaignId/oracle', element: <OraclePage /> },
     ],
   },
 ])
