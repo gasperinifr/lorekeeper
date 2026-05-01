@@ -199,7 +199,8 @@ export function RelationshipGraphPage() {
     if (!element) return
     const observer = new ResizeObserver(([entry]) => {
       const width = Math.max(360, Math.floor(entry.contentRect.width))
-      setSize({ width, height: Math.max(520, Math.floor(width * 0.58)) })
+      const availableHeight = Math.floor(entry.contentRect.height)
+      setSize({ width, height: Math.max(360, availableHeight || Math.floor(width * 0.58)) })
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -273,13 +274,13 @@ export function RelationshipGraphPage() {
   const nodeById = new Map(nodes.map(node => [node.id, node]))
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-4 mb-6">
+    <div className="h-full p-8 max-w-7xl mx-auto flex flex-col overflow-hidden">
+      <div className="flex flex-col gap-4 mb-6 shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link2 size={22} className="text-gold" />
             <div>
-              <h1 className="font-display text-2xl text-parchment">Grafo de Relacionamentos</h1>
+              <h1 className="font-display text-2xl text-parchment">Gráfico de Relacionamentos</h1>
               <p className="text-sm text-parchment/35">{nodes.length} nos conectados, {edges.length} relacoes</p>
             </div>
           </div>
@@ -310,15 +311,15 @@ export function RelationshipGraphPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-stone-300 bg-stone-100 overflow-hidden">
+      <div className="flex-1 min-h-0 rounded-lg border border-stone-300 bg-stone-100 overflow-hidden">
         {isLoading ? (
-          <div className="h-[520px] flex items-center justify-center text-sm text-parchment/30">Carregando grafo...</div>
+          <div className="h-full min-h-[360px] flex items-center justify-center text-sm text-parchment/30">Carregando grafo...</div>
         ) : nodes.length === 0 ? (
-          <div className="h-[520px] flex items-center justify-center text-sm text-parchment/30">
+          <div className="h-full min-h-[360px] flex items-center justify-center text-sm text-parchment/30">
             Nenhuma conexao encontrada com os filtros atuais.
           </div>
         ) : (
-          <svg ref={svgRef} viewBox={`0 0 ${size.width} ${size.height}`} className="block w-full bg-stone-200">
+          <svg ref={svgRef} viewBox={`0 0 ${size.width} ${size.height}`} className="block h-full w-full bg-stone-200">
             <g className="graph-stage">
               {/* Camada 1: Linhas/Edges */}
               <g className="edges-layer">

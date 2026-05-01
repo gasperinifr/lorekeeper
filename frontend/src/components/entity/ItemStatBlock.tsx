@@ -21,25 +21,36 @@ export function ItemStatBlock({ item }: { item: any }) {
 
   return (
     <div className="rounded-lg border border-amber-300/20 bg-stone-100 overflow-hidden">
-      <div className="p-5 border-b border-stone-300 bg-stone-200/60">
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span className="text-xs px-2 py-1 rounded border border-amber-300/25 bg-amber-300/10 text-amber-200">
-            {data.rarity ?? item.rarity ?? 'Comum'}
-          </span>
-          <span className="text-xs px-2 py-1 rounded border border-stone-300 text-parchment/50">
-            {data.type ?? item.type ?? 'Item'}
-          </span>
-          {data.source && (
-            <span className="text-xs px-2 py-1 rounded border border-stone-300 text-parchment/45 flex items-center gap-1">
-              <BookOpen size={11} /> {[data.source, data.page ? `p. ${data.page}` : null].filter(Boolean).join(' ')}
+      <div className="flex flex-col md:flex-row gap-5 p-5 border-b border-stone-300 bg-stone-200/60">
+        {item.image_url && (
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="w-full md:w-40 max-h-64 md:max-h-40 rounded-md object-contain border border-amber-300/30 bg-stone-300"
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-xs px-2 py-1 rounded border border-amber-300/25 bg-amber-300/10 text-amber-200">
+              {data.rarity ?? item.rarity ?? 'Comum'}
             </span>
+            <span className="text-xs px-2 py-1 rounded border border-stone-300 text-parchment/50">
+              {data.type ?? item.type ?? 'Item'}
+            </span>
+            {data.source && (
+              <span className="text-xs px-2 py-1 rounded border border-stone-300 text-parchment/45 flex items-center gap-1">
+                <BookOpen size={11} /> {[data.source, data.page ? `p. ${data.page}` : null].filter(Boolean).join(' ')}
+              </span>
+            )}
+          </div>
+          {data.requiresAttunement && (
+            <p className="text-sm text-gold/80 leading-relaxed">
+              Requer sintonização{data.attunementText ? `: ${data.attunementText}` : ''}
+            </p>
           )}
         </div>
-        {data.requiresAttunement && (
-          <p className="text-sm text-gold/80 leading-relaxed">
-            Requer sintonização{data.attunementText ? `: ${data.attunementText}` : ''}
-          </p>
-        )}
       </div>
 
       <div className="p-5 flex flex-col gap-5">
