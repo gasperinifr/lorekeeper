@@ -1,22 +1,26 @@
 name: Deploy Backend
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   deploy:
+    name: Deploy backend to Fly.io
     runs-on: ubuntu-latest
+    concurrency: deploy-backend
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - uses: superfly/flyctl-actions/deploy-via-dockerfile@master
-        with:
-          args: "deploy --remote-only"
-          workdir: ./backend
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        working-directory: ./backend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
