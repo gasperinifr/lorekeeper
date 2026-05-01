@@ -25,12 +25,15 @@ const EXTENDED_PRESETS = {
   role: [...PRESETS.role, 'Rival', 'Patrono', 'Cultista', 'Espiao', 'Contrabandista', 'Sacerdote', 'Erudito', 'Capitao', 'Cacador', 'Artista', 'Refugiado'],
   age: [...PRESETS.age, 'Adolescente', 'Imortal aparente', 'Idade incerta'],
   tone: [...PRESETS.tone, 'Arrogante', 'Cansado', 'Paranoico', 'Devoto', 'Sedutor', 'Sarcastico', 'Melancolico', 'Fanatico'],
+  background: ['Automatico', 'Exilado', 'Sobrevivente de guerra', 'Herdeiro falido', 'Ex-cultista', 'Agente de faccao', 'Criminoso arrependido', 'Nobre disfarcado', 'Orfao das ruas', 'Pesquisador obsessivo', 'Veterano cansado', 'Devoto em crise', 'Personalizado'],
+  location: ['Automatico', 'Taverna', 'Mercado', 'Templo', 'Porto', 'Guilda', 'Beco', 'Castelo', 'Biblioteca', 'Estrada', 'Ruina', 'Fronteira selvagem', 'Submundo urbano', 'Personalizado'],
+  secret: ['Automatico', 'Identidade falsa', 'Divida perigosa', 'Lealdade dupla', 'Crime antigo', 'Amor proibido', 'Pacto sobrenatural', 'Conhece uma profecia', 'Protege alguem', 'Chantageado', 'Personalizado'],
 } as const
 
 type PresetKey = keyof typeof EXTENDED_PRESETS
 
 function getPresetValue(value: string, custom: string) {
-  if (value === AUTO) return ''
+  if (value === AUTO || value === 'Automatico') return ''
   if (value === CUSTOM) return custom.trim()
   return value
 }
@@ -45,12 +48,18 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
     role: AUTO,
     age: AUTO,
     tone: AUTO,
+    background: 'Automatico',
+    location: 'Automatico',
+    secret: 'Automatico',
   })
   const [customPresets, setCustomPresets] = useState<Record<PresetKey, string>>({
     race: '',
     role: '',
     age: '',
     tone: '',
+    background: '',
+    location: '',
+    secret: '',
   })
   const generateNPC  = useGenerateNPC(campaignId)
   const createEntity = useCreateEntity(campaignId, 'npcs')
@@ -67,6 +76,9 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
       ['Função', getPresetValue(presets.role, customPresets.role)],
       ['Idade', getPresetValue(presets.age, customPresets.age)],
       ['Tom', getPresetValue(presets.tone, customPresets.tone)],
+      ['Background', getPresetValue(presets.background, customPresets.background)],
+      ['Localizacao/cena de entrada', getPresetValue(presets.location, customPresets.location)],
+      ['Segredo', getPresetValue(presets.secret, customPresets.secret)],
     ].filter(([, value]) => value)
 
     const presetText = selected.map(([label, value]) => `${label}: ${value}`).join('; ')
@@ -122,7 +134,7 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
             <input
               value={hint}
               onChange={e => setHint(e.target.value)}
-              placeholder='Ex: "uma estalajadeira anã, viúva e sabe de muitos segredos"'
+              placeholder='Ex: "um elfo órfão que detesta tieflings"'
               className="w-full bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment placeholder-parchment/30 focus:outline-none focus:border-gold/60"
               onKeyDown={e => e.key === 'Enter' && generate()}
             />
@@ -138,6 +150,9 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
               ['role', 'Função'],
               ['age', 'Idade'],
               ['tone', 'Tom'],
+              ['background', 'Background'],
+              ['location', 'Localização/cena de entrada'],
+              ['secret', 'Segredo'],
             ] as const).map(([key, label]) => (
               <div key={key} className="flex flex-col gap-1">
                 <label className="text-xs text-parchment/50 font-medium">{label}</label>

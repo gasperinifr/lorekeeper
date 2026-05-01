@@ -25,12 +25,15 @@ const EXTENDED_PRESETS = {
   scale: [...PRESETS.scale, 'Subterraneo', 'Vertical', 'Disperso', 'Megalitico', 'Em ruinas', 'Movel', 'Planar'],
   mood: [...PRESETS.mood, 'Opulento', 'Assombrado', 'Sufocante', 'Cerimonial', 'Caotico', 'Melancolico', 'Vivo demais', 'Esquecido'],
   importance: [...PRESETS.importance, 'Lar de faccao', 'Fonte de rumores', 'Prisao', 'Portal', 'Campo de batalha antigo', 'Santuario proibido', 'Recurso estrategico'],
+  history: ['Automatico', 'Recem-fundado', 'Conquistado', 'Reconstruido sobre ruinas', 'Amaldicoado', 'Antiga capital', 'Sede de culto extinto', 'Local de massacre', 'Ponto de peregrinacao', 'Criado por magia', 'Abandonado e reocupado', 'Personalizado'],
+  inhabitants: ['Automatico', 'Mercadores', 'Refugiados', 'Nobreza decadente', 'Cultistas', 'Mineiros', 'Piratas', 'Monges', 'Academicos', 'Soldados', 'Criaturas inteligentes', 'Comunidade isolada', 'Personalizado'],
+  conflict: ['Automatico', 'Guerra fria entre faccoes', 'Praga', 'Escassez', 'Assombracao', 'Corrupcao politica', 'Monstro nos arredores', 'Segredo soterrado', 'Portal instavel', 'Revolta popular', 'Personalizado'],
 } as const
 
 type PresetKey = keyof typeof EXTENDED_PRESETS
 
 function getPresetValue(value: string, custom: string) {
-  if (value === AUTO) return ''
+  if (value === AUTO || value === 'Automatico') return ''
   if (value === CUSTOM) return custom.trim()
   return value
 }
@@ -46,12 +49,18 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
     scale: AUTO,
     mood: AUTO,
     importance: AUTO,
+    history: 'Automatico',
+    inhabitants: 'Automatico',
+    conflict: 'Automatico',
   })
   const [customPresets, setCustomPresets] = useState<Record<PresetKey, string>>({
     type: '',
     scale: '',
     mood: '',
     importance: '',
+    history: '',
+    inhabitants: '',
+    conflict: '',
   })
 
   const generateLocation = useGenerateLocation(campaignId)
@@ -71,6 +80,9 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
       ['Escala', getPresetValue(presets.scale, customPresets.scale)],
       ['Atmosfera', getPresetValue(presets.mood, customPresets.mood)],
       ['Importância narrativa', getPresetValue(presets.importance, customPresets.importance)],
+      ['Historia', getPresetValue(presets.history, customPresets.history)],
+      ['Habitantes/faccoes', getPresetValue(presets.inhabitants, customPresets.inhabitants)],
+      ['Conflito atual', getPresetValue(presets.conflict, customPresets.conflict)],
     ].filter(([, value]) => value)
 
     const presetText = selected.map(([label, value]) => `${label}: ${value}`).join('; ')
@@ -166,6 +178,9 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
               ['scale', 'Escala'],
               ['mood', 'Atmosfera'],
               ['importance', 'Importância'],
+              ['history', 'Historia'],
+              ['inhabitants', 'Habitantes'],
+              ['conflict', 'Conflito'],
             ] as const).map(([key, label]) => (
               <div key={key} className="flex flex-col gap-1">
                 <label className="text-xs text-parchment/50 font-medium">{label}</label>

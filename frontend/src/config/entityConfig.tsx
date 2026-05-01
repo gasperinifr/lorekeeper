@@ -112,13 +112,6 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
           { key: 'data.motivation', label: 'Motivacao', type: 'textarea', rows: 2, placeholder: 'O que esse NPC quer, no fundo?' },
           { key: 'data.fear', label: 'Medo / Fraqueza', type: 'text', placeholder: 'O que ele teme ou o que o paralisa?' },
           { key: 'data.mannerism', label: 'Maneirismo', type: 'text', placeholder: 'Um habito, tique ou comportamento marcante' },
-          {
-            key: 'data.disposition',
-            label: 'Disposicao para com os PCs',
-            type: 'slider',
-            sliderMin: 1, sliderMax: 5,
-            sliderLabels: ['Hostil', 'Aliado'],
-          },
         ],
       },
       {

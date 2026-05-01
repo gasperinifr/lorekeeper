@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/AuthContext'
 import type { EntityType } from '@/types'
 import type { LinkSuggestion } from '@/hooks/useSuggestLinks'
+import type { FieldDef } from '@/config/entityConfig'
 
 const RELATION_LABELS: Record<string, string> = {
   alianca: 'alianca',
@@ -53,15 +54,32 @@ function Prose({ text }: { text: string }) {
   if (looksLikeHtml(text)) {
     return (
       <div
-        className="lk-rich-content text-sm text-parchment/70 leading-relaxed"
+        className="lk-rich-content text-base text-parchment/75 leading-relaxed"
         dangerouslySetInnerHTML={{ __html: sanitizeHtml(text) }}
       />
     )
   }
 
   return (
-    <p className="text-sm text-parchment/70 leading-relaxed whitespace-pre-wrap">{text}</p>
+    <p className="text-base text-parchment/75 leading-relaxed whitespace-pre-wrap">{text}</p>
   )
+}
+
+function getFieldValue(entity: any, field: FieldDef) {
+  if (field.key.startsWith('data.')) return entity.data?.[field.key.slice(5)]
+  return entity[field.key]
+}
+
+function hasValue(value: any) {
+  if (value === undefined || value === null || value === '') return false
+  if (Array.isArray(value)) return value.length > 0
+  return true
+}
+
+function renderValue(value: any) {
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Nao'
+  return String(value)
 }
 
 export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: EntityType }) {
@@ -115,17 +133,30 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
     (entityType === 'spells' && entity.data?.spellBlock) ||
     (entityType === 'items' && entity.data?.itemBlock)
   const structuredMeta = ['type','cr','level','school','casting_time','range','duration','components','rarity','properties']
+  const sectionFields = cfg.sections?.flatMap(section => section.fields) ?? []
+  const sectionFieldKeys = new Set(sectionFields.map(field => field.key))
   const textFields = cfg.fields.filter(f =>
-    f.type === 'textarea' && entity[f.key] && f.key !== 'secrets' && !hasStructuredBlock
+    f.type === 'textarea' && entity[f.key] && f.key !== 'secrets' && !sectionFieldKeys.has(f.key) && !hasStructuredBlock
   )
-  const secretsField = cfg.fields.find(f => f.key === 'secrets')
+  const secretsField = [...cfg.fields, ...sectionFields].find(f => f.key === 'secrets')
   const metaFields = cfg.fields.filter(f =>
     f.type !== 'textarea' &&
     f.key !== cfg.fields[0].key &&
     f.key !== 'image_url' &&
     f.key !== 'portrait_url' &&
+    !sectionFieldKeys.has(f.key) &&
     !(hasStructuredBlock && structuredMeta.includes(f.key))
   )
+  const visibleSections = (cfg.sections ?? [])
+    .map(section => ({
+      ...section,
+      fields: section.fields.filter(field => {
+        if (field.key === 'secrets') return false
+        if (hasStructuredBlock && structuredMeta.includes(field.key)) return false
+        return hasValue(getFieldValue(entity, field))
+      }),
+    }))
+    .filter(section => section.fields.length > 0)
   const imageUrl = entity.image_url ?? entity.portrait_url
   const imageKey = entity.image_url ? 'image_url' : entity.portrait_url ? 'portrait_url' : null
 
@@ -289,6 +320,28 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
                   <Prose text={entity[f.key]} />
                 </div>
               ) : null
+            ))}
+
+            {visibleSections.map(section => (
+              <section key={section.key} className="border-t border-stone-300 pt-5">
+                <h2 className="font-display text-lg text-parchment mb-4">{section.label}</h2>
+                <div className="grid grid-cols-1 gap-5">
+                  {section.fields.map(field => {
+                    const value = getFieldValue(entity, field)
+                    const isLongText = field.type === 'textarea' || String(value).length > 120
+                    return (
+                      <div key={field.key}>
+                        <h3 className="text-xs text-parchment/30 uppercase tracking-widest mb-2">{field.label}</h3>
+                        {isLongText ? (
+                          <Prose text={renderValue(value)} />
+                        ) : (
+                          <p className="text-base text-parchment/75 leading-relaxed">{renderValue(value)}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
             ))}
 
             {/* Segredos do mestre */}
