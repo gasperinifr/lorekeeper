@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Pencil, Trash2, ArrowLeft } from 'lucide-react'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
+import { Pencil, Trash2, ArrowLeft, Link2, X } from 'lucide-react'
 import { useEntityDetail, useDeleteEntity } from '@/hooks/useEntities'
+import { useCreateLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { LinksPanel } from '@/components/entity/LinksPanel'
 import { CreatureStatBlock } from '@/components/entity/CreatureStatBlock'
@@ -11,6 +12,21 @@ import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/AuthContext'
 import type { EntityType } from '@/types'
+import type { LinkSuggestion } from '@/hooks/useSuggestLinks'
+
+const RELATION_LABELS: Record<string, string> = {
+  alianca: 'alianca',
+  rivalidade: 'rivalidade',
+  familia: 'familia',
+  lealdade: 'lealdade',
+  segredo: 'segredo',
+  divida: 'divida',
+  amor: 'amor',
+  odio: 'odio',
+  mentor: 'mentor',
+  neutro: 'neutro',
+  outro: 'outro',
+}
 
 // Renderiza markdown simples (quebras de linha → <br>)
 function looksLikeHtml(value: string) {
@@ -53,13 +69,18 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
     campaignId: string; entityType: EntityType; entityId: string
   }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const [deleteError, setDeleteError] = useState('')
+  const [suggestions, setSuggestions] = useState<LinkSuggestion[]>(
+    () => (location.state as { linkSuggestions?: LinkSuggestion[] } | null)?.linkSuggestions ?? []
+  )
 
   const entityType = entityTypeOverride ?? routeEntityType
   const cfg = ENTITY_CONFIG[entityType!]
   const { data: entity, isLoading } = useEntityDetail(campaignId!, entityType!, entityId!)
   const deleteEntity = useDeleteEntity(campaignId!, entityType!)
+  const createLink = useCreateLink(campaignId!)
 
   const canEdit = entity && ['admin', 'editor'].includes(entity._role)
 
@@ -72,6 +93,18 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
     } catch (err: any) {
       setDeleteError(err.message ?? 'Não foi possível excluir.')
     }
+  }
+
+  const connectSuggestion = async (suggestion: LinkSuggestion) => {
+    await createLink.mutateAsync({
+      source_type: entityType!,
+      source_id: entityId!,
+      target_type: suggestion.target_type,
+      target_id: suggestion.target_id,
+      relation_type: suggestion.relation_type,
+      relation_label: suggestion.relation_label,
+    })
+    setSuggestions(current => current.filter(item => item !== suggestion))
   }
 
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
@@ -98,6 +131,59 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
 
   return (
     <div className="p-8">
+      {suggestions.length > 0 && (
+        <div className="fixed right-6 top-6 z-40 w-80 rounded-lg border border-gold/25 bg-stone-100 shadow-xl p-4 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-parchment font-medium flex items-center gap-2">
+                <Link2 size={14} className="text-gold" /> Sugestoes de conexao
+              </p>
+              <p className="text-xs text-parchment/35 mt-1">Opcional, voce pode descartar tudo.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuggestions([])}
+              className="text-parchment/35 hover:text-parchment/70 transition-colors"
+              aria-label="Fechar sugestoes"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {suggestions.map(suggestion => (
+              <div key={`${suggestion.target_type}-${suggestion.target_id}`} className="rounded border border-stone-300 bg-stone-200 p-3 flex flex-col gap-2">
+                <div>
+                  <p className="text-xs text-parchment">
+                    {suggestion.target_name ?? suggestion.target_id}
+                    <span className="text-gold ml-2">{RELATION_LABELS[suggestion.relation_type] ?? suggestion.relation_type}</span>
+                  </p>
+                  {suggestion.relation_label && (
+                    <p className="text-xs text-parchment/35 mt-0.5">{suggestion.relation_label}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => connectSuggestion(suggestion)}
+                    loading={createLink.isPending}
+                    className="flex-1"
+                  >
+                    Conectar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSuggestions(current => current.filter(item => item !== suggestion))}
+                  >
+                    Ignorar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <Link
         to={`/campaigns/${campaignId}/${entityType}`}

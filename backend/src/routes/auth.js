@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 
 export async function authRoutes(fastify) {
   const { db } = fastify

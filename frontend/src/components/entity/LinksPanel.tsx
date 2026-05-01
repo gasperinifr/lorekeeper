@@ -8,7 +8,7 @@ import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useAddEventLink, useEvents } from '@/hooks/useEvents'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
-import type { Arc, EntityEventLink, EntityLink, EntityType, LinkableType, Session, Tag } from '@/types'
+import type { Arc, EntityEventLink, EntityLink, EntityType, LinkableType, RelationType, Session, Tag } from '@/types'
 import { clsx } from 'clsx'
 
 interface Props {
@@ -47,6 +47,34 @@ const RELATION_SUGGESTIONS = [
   'revela',
 ]
 
+const RELATION_TYPE_LABELS: Record<RelationType, string> = {
+  alianca: 'alianca',
+  rivalidade: 'rivalidade',
+  familia: 'familia',
+  lealdade: 'lealdade',
+  segredo: 'segredo',
+  divida: 'divida',
+  amor: 'amor',
+  odio: 'odio',
+  mentor: 'mentor',
+  neutro: 'neutro',
+  outro: 'outro',
+}
+
+export const RELATION_TYPE_COLORS: Record<RelationType, string> = {
+  alianca: 'text-emerald-400',
+  rivalidade: 'text-rose-400',
+  familia: 'text-sky-400',
+  lealdade: 'text-violet-400',
+  segredo: 'text-amber-400',
+  divida: 'text-orange-400',
+  amor: 'text-pink-400',
+  odio: 'text-red-500',
+  mentor: 'text-cyan-400',
+  neutro: 'text-parchment/50',
+  outro: 'text-parchment/40',
+}
+
 function getLinkableOption(type: LinkableType): LinkableOption | undefined {
   if (type in ENTITY_CONFIG) {
     const cfg = ENTITY_CONFIG[type as EntityType]
@@ -61,7 +89,13 @@ function isEntityType(type: LinkableType): type is EntityType {
 
 export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit }: Props) {
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ target_type: '' as LinkableType | '', target_id: '', relation_label: '' })
+  const initialLinkForm = {
+    target_type: '' as LinkableType | '',
+    target_id: '',
+    relation_label: '',
+    relation_type: 'outro' as RelationType,
+  }
+  const [form, setForm] = useState(initialLinkForm)
 
   const createLink = useCreateLink(campaignId)
   const deleteLink = useDeleteLink(campaignId)
@@ -109,7 +143,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
         role: form.relation_label || undefined,
       })
       setAdding(false)
-      setForm({ target_type: '', target_id: '', relation_label: '' })
+      setForm(initialLinkForm)
       return
     }
     await createLink.mutateAsync({
@@ -118,9 +152,10 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
       target_type: form.target_type,
       target_id: form.target_id,
       relation_label: form.relation_label || undefined,
+      relation_type: form.relation_type,
     })
     setAdding(false)
-    setForm({ target_type: '', target_id: '', relation_label: '' })
+    setForm(initialLinkForm)
   }
 
   const getLinkedTarget = (link: EntityLink) => {
@@ -211,12 +246,24 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
               list="relation-suggestions"
               value={form.relation_label}
               onChange={e => setForm(f => ({ ...f, relation_label: e.target.value }))}
-              placeholder="Relacao: aparece em, protege, revela..."
+              placeholder="Observacao da relacao..."
               className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 placeholder-parchment/30 focus:outline-none"
             />
             <datalist id="relation-suggestions">
               {RELATION_SUGGESTIONS.map(relation => <option key={relation} value={relation} />)}
             </datalist>
+
+            {form.target_type !== 'events' && (
+              <select
+                value={form.relation_type}
+                onChange={e => setForm(f => ({ ...f, relation_type: e.target.value as RelationType }))}
+                className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 focus:outline-none"
+              >
+                {(Object.keys(RELATION_TYPE_LABELS) as RelationType[]).map(relation => (
+                  <option key={relation} value={relation}>{RELATION_TYPE_LABELS[relation]}</option>
+                ))}
+              </select>
+            )}
 
             <div className="flex gap-2 mt-1">
               <Button size="sm" onClick={submit} loading={createLink.isPending} className="flex-1">Conectar</Button>
@@ -241,6 +288,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
             const Icon = meta.icon
             const item = findItem(type, id)
             const name = item ? displayName(type, item) : id
+            const relationType = link.relation_type ?? 'outro'
             return (
               <div key={link.id} className="flex items-center gap-2 group">
                 <Link
@@ -249,13 +297,17 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                 >
                   <Icon size={13} className={clsx('shrink-0', meta.accentClass)} />
                   <div className="min-w-0">
-                    <p className="text-xs text-parchment truncate">
-                      {link.relation_label && (
-                        <span className="text-parchment/40 mr-1">{link.relation_label} -</span>
-                      )}
+                    <p className="text-xs text-parchment truncate flex items-center gap-1">
+                      <span className={clsx('shrink-0 text-[10px] uppercase tracking-wide', RELATION_TYPE_COLORS[relationType])}>
+                        {RELATION_TYPE_LABELS[relationType]}
+                      </span>
                       {name}
                     </p>
-                    <p className="text-xs text-parchment/30">{meta.label}</p>
+                    <p className="text-xs text-parchment/30 truncate">
+                      {[meta.label, link.relation_label]
+                        .filter(Boolean)
+                        .join(' - ')}
+                    </p>
                   </div>
                 </Link>
                 {canEdit && (

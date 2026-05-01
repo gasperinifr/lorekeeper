@@ -1,6 +1,13 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
 
 const VALID = ['characters','npcs','locations','items','spells','creatures','notes','sessions','arcs','encounters']
+const RELATION_TYPES = ['alianca','rivalidade','familia','lealdade','segredo','divida','amor','odio','mentor','neutro','outro']
+
+function normalizeLinkBody(body) {
+  return {
+    relation_type: RELATION_TYPES.includes(body.relation_type) ? body.relation_type : 'outro',
+  }
+}
 
 export async function linkRoutes(fastify) {
   const { db } = fastify
@@ -12,15 +19,18 @@ export async function linkRoutes(fastify) {
 
   fastify.post('/campaigns/:campaignId/links', { preHandler: requireEditor }, async (req, reply) => {
     const { source_type, source_id, target_type, target_id, relation_label } = req.body
+    const { relation_type } = normalizeLinkBody(req.body)
     for (const t of [source_type, target_type]) {
       if (!VALID.includes(t)) return reply.status(400).send({ error: `Tipo inválido: ${t}` })
     }
     const { rows } = await db.query(
-      `INSERT INTO entity_links (campaign_id,source_type,source_id,target_type,target_id,relation_label)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       ON CONFLICT (source_type,source_id,target_type,target_id) DO UPDATE SET relation_label=EXCLUDED.relation_label
+      `INSERT INTO entity_links (campaign_id,source_type,source_id,target_type,target_id,relation_label,relation_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (source_type,source_id,target_type,target_id) DO UPDATE SET
+         relation_label=EXCLUDED.relation_label,
+         relation_type=EXCLUDED.relation_type
        RETURNING *`,
-      [req.params.campaignId, source_type, source_id, target_type, target_id, relation_label]
+      [req.params.campaignId, source_type, source_id, target_type, target_id, relation_label, relation_type]
     )
     return reply.status(201).send(rows[0])
   })

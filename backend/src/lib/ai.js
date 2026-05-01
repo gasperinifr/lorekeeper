@@ -47,6 +47,18 @@ function line(label, value) {
   return text ? `${label}: ${text}` : null
 }
 
+function renderData(data, max = 420) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return ''
+  const entries = Object.entries(data).filter(([, value]) => {
+    if (value === null || value === undefined || value === '') return false
+    if (Array.isArray(value)) return value.length > 0
+    if (typeof value === 'object') return Object.keys(value).length > 0
+    return true
+  })
+  if (!entries.length) return ''
+  return compact(JSON.stringify(Object.fromEntries(entries)), max)
+}
+
 function renderList(title, rows, render, empty = 'nenhum') {
   const body = rows.map(render).filter(Boolean).join('\n')
   return `${title}\n${body || `- ${empty}`}`
@@ -101,50 +113,44 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     db.query(
       `SELECT id,name,role,race,description,personality,secrets,is_alive,data FROM npcs
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY updated_at DESC
-       LIMIT 35`,
+       ORDER BY updated_at DESC`,
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,race,class,level,description,backstory,is_active FROM characters
+      `SELECT id,name,race,class,level,description,backstory,is_active,data FROM characters
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        ORDER BY name ASC
-       LIMIT 30`,
+      `,
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,type,description FROM locations
+      `SELECT id,name,type,description,data FROM locations
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY name ASC
-       LIMIT 35`,
+       ORDER BY name ASC`,
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,type,rarity,description,properties FROM items
+      `SELECT id,name,type,rarity,description,properties,data FROM items
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY updated_at DESC
-       LIMIT 25`,
+       ORDER BY updated_at DESC`,
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,level,school,description FROM spells
+      `SELECT id,name,level,school,casting_time,range,components,duration,description,data FROM spells
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY level ASC, name ASC
-       LIMIT 25`,
+       ORDER BY level ASC, name ASC`,
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,type,cr,description FROM creatures
+      `SELECT id,name,type,cr,description,data FROM creatures
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY name ASC
-       LIMIT 25`,
+       ORDER BY name ASC`,
       [campaignId]
     ),
     db.query(
       `SELECT id,title,content,is_secret FROM notes
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)} ${publicOnly ? 'AND is_secret=false' : ''}
-       ORDER BY updated_at DESC
-       LIMIT 18`,
+       ORDER BY updated_at DESC`,
       [campaignId]
     ),
     db.query(
@@ -255,13 +261,24 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     `Status: ${c.status ?? 'active'}`,
     `Modo de informacao: ${safeMode === 'dm' ? 'DM, pode usar segredos e notas privadas' : 'Jogador, use apenas informacoes publicas'}`,
     line('Premissa', c.description),
-    renderList('Locais', locations.rows, r => `- ${r.name}${r.type ? ` (${r.type})` : ''}${r.description ? `: ${compact(r.description, 260)}` : ''}`),
+    renderList('Locais', locations.rows, r => {
+      const data = renderData(r.data)
+      return `- ${r.name}${r.type ? ` (${r.type})` : ''}${r.description ? `: ${compact(r.description, 260)}` : ''}${data ? ` Dados: ${data}` : ''}`
+    }),
     renderList('Itens notaveis', items.rows, r => {
       const parts = [r.type, r.rarity].filter(Boolean).join(', ')
-      return `- ${r.name}${parts ? ` (${parts})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.properties && safeMode === 'dm' ? ` Propriedades: ${compact(r.properties, 180)}` : ''}`
+      const data = renderData(r.data)
+      return `- ${r.name}${parts ? ` (${parts})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.properties ? ` Propriedades: ${compact(r.properties, 180)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
-    renderList('Criaturas', creatures.rows, r => `- ${r.name}${r.type || r.cr ? ` (${[r.type, r.cr && `CR ${r.cr}`].filter(Boolean).join(', ')})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}`),
-    renderList('Magias', spells.rows, r => `- ${r.name}${r.level !== null || r.school ? ` (${[r.level !== null && `nivel ${r.level}`, r.school].filter(Boolean).join(', ')})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}`),
+    renderList('Criaturas', creatures.rows, r => {
+      const data = renderData(r.data)
+      return `- ${r.name}${r.type || r.cr ? ` (${[r.type, r.cr && `CR ${r.cr}`].filter(Boolean).join(', ')})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
+    }),
+    renderList('Magias', spells.rows, r => {
+      const data = renderData(r.data)
+      const meta = [r.level !== null && `nivel ${r.level}`, r.school, r.casting_time, r.range, r.duration, r.components].filter(Boolean).join(', ')
+      return `- ${r.name}${meta ? ` (${meta})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
+    }),
     '</world>',
     '<narrative>',
     renderList('Arcos', arcs.rows, r => `- ${r.title} [${r.status ?? 'sem status'}]${r.summary ? `: ${compact(r.summary, 280)}` : ''}`),
@@ -296,16 +313,18 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     '<cast>',
     renderList('Personagens', characters.rows, r => {
       const profile = [r.race, r.class, r.level && `nivel ${r.level}`].filter(Boolean).join(' ')
-      return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${safeMode === 'dm' && r.backstory ? ` Backstory: ${compact(r.backstory, 220)}` : ''}`
+      const data = renderData(r.data)
+      return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.backstory ? ` Backstory: ${compact(r.backstory, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     renderList('NPCs', npcs.rows, r => {
       const profile = [r.race, r.role, r.is_alive === false ? 'morto' : null].filter(Boolean).join(', ')
       const hook = typeof r.data?.hook === 'string' ? compact(r.data.hook, 220) : ''
-      return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.personality ? ` Personalidade: ${compact(r.personality, 160)}` : ''}${hook ? ` Como encontrar: ${hook}` : ''}${safeMode === 'dm' && r.secrets ? ` Segredos: ${compact(r.secrets, 220)}` : ''}`
+      const data = renderData(r.data)
+      return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.personality ? ` Personalidade: ${compact(r.personality, 160)}` : ''}${hook ? ` Como encontrar: ${hook}` : ''}${safeMode === 'dm' && r.secrets ? ` Segredos: ${compact(r.secrets, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     '</cast>',
   ].filter(Boolean)
 
   const context = blocks.join('\n')
-  return context.length > 12000 ? `${context.slice(0, 11950)}\n[contexto compactado]` : context
+  return context.length > 30000 ? `${context.slice(0, 29950)}\n[contexto compactado]` : context
 }

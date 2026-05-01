@@ -135,4 +135,6 @@ export async function ensureSchema(db) {
   await db.query('CREATE INDEX IF NOT EXISTS idx_events_type_impact ON events(campaign_id, type, impact)')
   await db.query('CREATE INDEX IF NOT EXISTS idx_eel_event          ON event_entity_links(event_id)')
   await db.query('CREATE INDEX IF NOT EXISTS idx_eel_entity         ON event_entity_links(campaign_id, entity_type, entity_id)')
+
+  await db.query("ALTER TABLE entity_links ADD COLUMN IF NOT EXISTS relation_type VARCHAR(50) DEFAULT 'outro'")
 }

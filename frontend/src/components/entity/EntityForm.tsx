@@ -1,11 +1,14 @@
 import { useMemo, useState, FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Calendar, GitBranch, Link2, Plus, Trash2, X } from 'lucide-react'
+import { Calendar, GitBranch, Link2, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
+import { EntitySection } from '@/components/entity/EntitySection'
 import { useCreateEntity, useEntityList, useUpdateEntity } from '@/hooks/useEntities'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useCreateLink } from '@/hooks/useLinks'
 import { useCampaign } from '@/hooks/useCampaign'
+import { useEntityDraft } from '@/hooks/useEntityDraft'
+import { useSuggestLinks } from '@/hooks/useSuggestLinks'
 import { Input } from '@/components/ui/Input'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
@@ -30,6 +33,23 @@ const visibilityLabels: Record<string, string> = {
 }
 
 const serializeForm = (value: unknown) => JSON.stringify(value ?? null)
+const DRAFT_TYPES: EntityType[] = ['npcs', 'locations', 'creatures', 'items']
+
+function flattenEntityData(entity?: Record<string, any>) {
+  if (!entity) return undefined
+  return {
+    ...entity,
+    ...(entity.data && typeof entity.data === 'object'
+      ? Object.fromEntries(Object.entries(entity.data).map(([key, value]) => [`data.${key}`, value]))
+      : {}),
+  }
+}
+
+function fieldDefault(type: string) {
+  if (type === 'toggle') return true
+  if (type === 'tags-input') return []
+  return ''
+}
 
 function SmallField({ label, value, onChange, type = 'text' }: {
   label: string
@@ -229,6 +249,7 @@ interface PendingConnection {
   target_type: LinkableType
   target_id: string
   relation_label?: string
+  relation_type?: string
   label: string
 }
 
@@ -348,22 +369,31 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const [searchParams] = useSearchParams()
   const isEdit = !!entityId
   const initialParentId = type === 'locations' ? searchParams.get('parentId') ?? '' : ''
+  const allConfigFields = useMemo(
+    () => [...cfg.fields, ...(cfg.sections?.flatMap(section => section.fields) ?? [])],
+    [cfg.fields, cfg.sections]
+  )
   const initialForm = useMemo(
-    () => initial ?? {
-      ...Object.fromEntries(cfg.fields.map(f => [f.key, f.key === 'visibility' ? 'public' : f.type === 'toggle' ? true : ''])),
+    () => flattenEntityData(initial) ?? {
+      ...Object.fromEntries(allConfigFields.map(f => [f.key, f.key === 'visibility' ? 'public' : fieldDefault(f.type)])),
       ...(type === 'locations' && initialParentId ? { parent_id: initialParentId } : {}),
     },
-    [cfg.fields, initial, initialParentId, type]
+    [allConfigFields, initial, initialParentId, type]
   )
 
   const [form, setForm] = useState<Record<string, any>>(initialForm)
   const [savedSnapshot, setSavedSnapshot] = useState(() => serializeForm({ form: initialForm, pendingConnections: [] }))
   const [error, setError] = useState('')
+  const [draftError, setDraftError] = useState('')
+  const [showDraftHint, setShowDraftHint] = useState(false)
+  const [draftHint, setDraftHint] = useState('')
   const [pendingConnections, setPendingConnections] = useState<PendingConnection[]>([])
 
   const create = useCreateEntity(campaignId, type)
   const update = useUpdateEntity(campaignId, type, entityId ?? '')
   const createLink = useCreateLink(campaignId)
+  const draft = useEntityDraft(campaignId)
+  const suggestLinks = useSuggestLinks(campaignId)
   const { data: campaign } = useCampaign(campaignId)
   const { data: locations = [] } = useEntityList(campaignId, 'locations', type === 'locations')
   const canShareWithUser = campaign?.role === 'admin' || campaign?.play_role === 'gm'
@@ -373,7 +403,13 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     setForm(f => ({ ...f, data: { ...(f.data ?? {}), [key]: val } }))
 
   const buildPayload = () => {
-    const payload: Record<string, any> = { ...form, data: form.data ? { ...form.data } : form.data }
+    const payload: Record<string, any> = {}
+    const dataFields: Record<string, any> = form.data && typeof form.data === 'object' ? { ...form.data } : {}
+    for (const [key, value] of Object.entries(form)) {
+      if (key.startsWith('data.')) dataFields[key.slice(5)] = value
+      else payload[key] = value
+    }
+    payload.data = dataFields
     if (type === 'locations' && payload.parent_id === '') payload.parent_id = null
     if (payload.visibility !== 'user') payload.shared_with_user_id = null
     if (payload.visibility === 'user' && payload.shared_with_user_id === '') payload.shared_with_user_id = null
@@ -412,17 +448,70 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
         target_type: link.target_type,
         target_id: link.target_id,
         relation_label: link.relation_label,
+        relation_type: link.relation_type as any,
       })))
     }
     setSavedSnapshot(serializeForm({ form, pendingConnections }))
     return result
   }
 
+  const applyDraft = (draftValues: Record<string, any>) => {
+    setForm(prev => {
+      const next = { ...prev }
+      const applyField = (key: string, value: any) => {
+        if (value === undefined || value === null || value === '') return
+        const current = next[key]
+        const isEmptyArray = Array.isArray(current) && current.length === 0
+        if (current === undefined || current === null || current === '' || isEmptyArray) {
+          next[key] = value
+        }
+      }
+
+      for (const [key, value] of Object.entries(draftValues)) {
+        if (key === 'data' && value && typeof value === 'object' && !Array.isArray(value)) {
+          for (const [dataKey, dataValue] of Object.entries(value as Record<string, any>)) {
+            applyField(`data.${dataKey}`, dataValue)
+          }
+        } else {
+          applyField(key, value)
+        }
+      }
+      return next
+    })
+  }
+
+  const generateDraft = async () => {
+    const name = String(form.name ?? '').trim()
+    if (name.length < 2) return
+    setDraftError('')
+    try {
+      const result = await draft.generate({ entity_type: type, name, hint: draftHint.trim() || undefined })
+      applyDraft(result)
+    } catch {
+      setDraftError('Nao foi possivel gerar o rascunho agora.')
+    }
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     try {
       const result = await saveEntity()
-      runWithoutPrompt(() => navigate(`/campaigns/${campaignId}/${type}/${result.id}`))
+      let linkSuggestions: any[] = []
+      if (!isEdit) {
+        try {
+          linkSuggestions = await suggestLinks.suggest({
+            entity_type: type,
+            entity_id: result.id,
+            name: result.name ?? result.title ?? form.name ?? '',
+            description: result.description ?? form.description,
+          })
+        } catch {
+          linkSuggestions = []
+        }
+      }
+      runWithoutPrompt(() => navigate(`/campaigns/${campaignId}/${type}/${result.id}`, {
+        state: linkSuggestions.length ? { linkSuggestions } : undefined,
+      }))
     } catch (err: any) {
       setError(err.message)
     }
@@ -468,6 +557,44 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-5">
+        {DRAFT_TYPES.includes(type) && (
+          <div className="rounded-lg border border-gold/20 bg-gold/5 p-4 flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p className="text-sm text-parchment/70 font-medium">Rascunho assistido</p>
+                <p className="text-xs text-parchment/35 mt-1">A IA preenche apenas campos vazios; voce edita tudo antes de salvar.</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={generateDraft}
+                loading={draft.isPending}
+                disabled={String(form.name ?? '').trim().length < 2}
+              >
+                <Sparkles size={13} /> Gerar rascunho
+              </Button>
+            </div>
+            {showDraftHint ? (
+              <Input
+                label="Direcao (opcional)"
+                value={draftHint}
+                onChange={event => setDraftHint(event.target.value)}
+                placeholder="Ex: tom sombrio, ligado a uma ruina antiga..."
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDraftHint(true)}
+                className="self-start text-xs text-gold hover:text-gold-light transition-colors"
+              >
+                Adicionar direcao
+              </button>
+            )}
+            {draftError && <p className="text-xs text-crimson-light">{draftError}</p>}
+          </div>
+        )}
+
         {cfg.fields.map(field => {
           if (field.key === 'image_url' || field.key === 'portrait_url') return null
 
@@ -563,6 +690,72 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             </div>
           )
 
+          if (field.type === 'slider') {
+            const min = field.sliderMin ?? 1
+            const max = field.sliderMax ?? 5
+            const current = form[field.key] ?? Math.round((min + max) / 2)
+            return (
+              <div key={field.key} className="flex flex-col gap-2">
+                <label className="text-sm text-parchment/70 font-medium">{field.label}</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    value={current}
+                    onChange={e => set(field.key, Number(e.target.value))}
+                    className="w-full accent-gold"
+                  />
+                  <span className="text-xs text-gold w-6 text-right">{current}</span>
+                </div>
+                {field.sliderLabels && (
+                  <div className="flex justify-between text-[11px] text-parchment/35">
+                    <span>{field.sliderLabels[0]}</span>
+                    <span>{field.sliderLabels[1]}</span>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          if (field.type === 'tags-input') {
+            const value = Array.isArray(form[field.key]) ? form[field.key] : []
+            return (
+              <div key={field.key} className="flex flex-col gap-2">
+                <label className="text-sm text-parchment/70 font-medium">{field.label}</label>
+                <Input
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter' && e.key !== ',') return
+                    e.preventDefault()
+                    const next = e.currentTarget.value.trim().replace(/,$/, '')
+                    if (next && !value.includes(next)) set(field.key, [...value, next])
+                    e.currentTarget.value = ''
+                  }}
+                  onBlur={e => {
+                    const next = e.currentTarget.value.trim()
+                    if (next && !value.includes(next)) set(field.key, [...value, next])
+                    e.currentTarget.value = ''
+                  }}
+                  placeholder={field.placeholder}
+                />
+                {!!value.length && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {value.map((tag: string) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => set(field.key, value.filter((item: string) => item !== tag))}
+                        className="text-xs rounded-full border border-gold/25 bg-gold/10 text-gold px-2 py-1 inline-flex items-center gap-1"
+                      >
+                        {tag} <X size={11} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return null
         })}
         {imageField && (
@@ -581,6 +774,15 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             />
           </div>
         )}
+
+        {cfg.sections?.map(section => (
+          <EntitySection
+            key={section.key}
+            section={section}
+            formValues={form}
+            onChange={set}
+          />
+        ))}
 
         <Structured5eEditor type={type} data={form.data ?? {}} setData={setData} />
 

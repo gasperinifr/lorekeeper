@@ -7,7 +7,7 @@ import { useEntityList } from '@/hooks/useEntities'
 import { useAllLinks } from '@/hooks/useLinks'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useEvents } from '@/hooks/useEvents'
-import type { EntityLink, EntityType, LinkableType } from '@/types'
+import type { EntityLink, EntityType, LinkableType, RelationType } from '@/types'
 
 declare global {
   interface Window {
@@ -38,6 +38,29 @@ type GraphEdge = {
   source: string | GraphNode
   target: string | GraphNode
   label?: string
+  relation_type?: RelationType
+}
+
+const RELATION_TYPE_HEX: Record<RelationType, string> = {
+  alianca: '#34d399',
+  rivalidade: '#fb7185',
+  familia: '#38bdf8',
+  lealdade: '#a78bfa',
+  segredo: '#fbbf24',
+  divida: '#fb923c',
+  amor: '#f472b6',
+  odio: '#ef4444',
+  mentor: '#22d3ee',
+  neutro: '#c9c0aa',
+  outro: '#8f8777',
+}
+
+function edgeStyle(edge: GraphEdge) {
+  return {
+    stroke: RELATION_TYPE_HEX[edge.relation_type ?? 'outro'],
+    strokeWidth: 1.6,
+    opacity: 0.72,
+  }
 }
 
 const TYPE_META: Partial<Record<GraphType, {
@@ -176,6 +199,7 @@ export function RelationshipGraphPage() {
           source: nodeKey(link.source_type, link.source_id),
           target: nodeKey(link.target_type, link.target_id),
           label: link.relation_label,
+          relation_type: link.relation_type,
         })),
       ...(events.data ?? []).flatMap(event => {
         const eventEdges = event.entity_links
@@ -370,9 +394,18 @@ export function RelationshipGraphPage() {
                   const sy = source.y ?? size.height / 2
                   const tx = target.x ?? size.width / 2
                   const ty = target.y ?? size.height / 2
+                  const style = edgeStyle(edge)
                   return (
                     <g key={`${edge.id}-${version}`}>
-                      <line x1={sx} y1={sy} x2={tx} y2={ty} stroke="rgba(201,192,170,0.24)" strokeWidth={1.4} />
+                      <line
+                        x1={sx}
+                        y1={sy}
+                        x2={tx}
+                        y2={ty}
+                        stroke={style.stroke}
+                        strokeWidth={style.strokeWidth}
+                        opacity={style.opacity}
+                      />
                     </g>
                   )
                 })}

@@ -65,6 +65,10 @@ export interface Session {
   encounter_count?: number
 }
 
+export type RelationType =
+  | 'alianca' | 'rivalidade' | 'familia' | 'lealdade' | 'segredo'
+  | 'divida' | 'amor' | 'odio' | 'mentor' | 'neutro' | 'outro'
+
 export interface EntityLink {
   id: string
   source_type: LinkableType
@@ -72,6 +76,7 @@ export interface EntityLink {
   target_type: LinkableType
   target_id: string
   relation_label?: string
+  relation_type?: RelationType
 }
 
 export interface ChatMention {

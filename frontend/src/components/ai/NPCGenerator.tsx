@@ -20,7 +20,14 @@ const PRESETS = {
   tone: ['Automático', 'Amigável', 'Misterioso', 'Ameaçador', 'Cômico', 'Trágico', 'Excêntrico', 'Solenemente educado', 'Personalizado'],
 } as const
 
-type PresetKey = keyof typeof PRESETS
+const EXTENDED_PRESETS = {
+  race: [...PRESETS.race, 'Meio-elfo', 'Aasimar', 'Genasi', 'Tabaxi', 'Kenku', 'Firbolg', 'Orc', 'Reborn', 'Changeling'],
+  role: [...PRESETS.role, 'Rival', 'Patrono', 'Cultista', 'Espiao', 'Contrabandista', 'Sacerdote', 'Erudito', 'Capitao', 'Cacador', 'Artista', 'Refugiado'],
+  age: [...PRESETS.age, 'Adolescente', 'Imortal aparente', 'Idade incerta'],
+  tone: [...PRESETS.tone, 'Arrogante', 'Cansado', 'Paranoico', 'Devoto', 'Sedutor', 'Sarcastico', 'Melancolico', 'Fanatico'],
+} as const
+
+type PresetKey = keyof typeof EXTENDED_PRESETS
 
 function getPresetValue(value: string, custom: string) {
   if (value === AUTO) return ''
@@ -82,7 +89,10 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
       name: result.name, race: result.race, role: result.role,
       description: result.description, personality: result.personality,
       secrets: result.secrets,
-      data: result.hook ? { hook: result.hook } : {},
+      data: {
+        ...(result.data ?? {}),
+        ...(result.hook ? { hook: result.hook } : {}),
+      },
       visibility,
     })
     onCreated?.(saved)
@@ -136,7 +146,7 @@ export function NPCGenerator({ campaignId, onClose, onCreated }: Props) {
                   onChange={e => setPreset(key, e.target.value)}
                   className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-xs text-parchment focus:outline-none focus:border-gold/60"
                 >
-                  {PRESETS[key].map(option => (
+                  {EXTENDED_PRESETS[key].map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>

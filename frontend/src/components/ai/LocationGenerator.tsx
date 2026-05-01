@@ -20,7 +20,14 @@ const PRESETS = {
   importance: ['Automático', 'Cenário de passagem', 'Base segura', 'Ponto de conflito', 'Segredo antigo', 'Centro político', 'Ameaça iminente', 'Personalizado'],
 } as const
 
-type PresetKey = keyof typeof PRESETS
+const EXTENDED_PRESETS = {
+  type: [...PRESETS.type, 'Bairro', 'Templo', 'Biblioteca', 'Mercado', 'Acampamento', 'Fortaleza', 'Laboratorio', 'Cemiterio', 'Ilha', 'Monasterio', 'Esgoto', 'Arena', 'Sede de guilda'],
+  scale: [...PRESETS.scale, 'Subterraneo', 'Vertical', 'Disperso', 'Megalitico', 'Em ruinas', 'Movel', 'Planar'],
+  mood: [...PRESETS.mood, 'Opulento', 'Assombrado', 'Sufocante', 'Cerimonial', 'Caotico', 'Melancolico', 'Vivo demais', 'Esquecido'],
+  importance: [...PRESETS.importance, 'Lar de faccao', 'Fonte de rumores', 'Prisao', 'Portal', 'Campo de batalha antigo', 'Santuario proibido', 'Recurso estrategico'],
+} as const
+
+type PresetKey = keyof typeof EXTENDED_PRESETS
 
 function getPresetValue(value: string, custom: string) {
   if (value === AUTO) return ''
@@ -95,6 +102,11 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
       name: result.name,
       type: result.type,
       description,
+      data: {
+        ...(result.data ?? {}),
+        ...(result.hook ? { plot_hook: result.hook } : {}),
+        ...(result.secret ? { dm_notes: result.secret } : {}),
+      },
       parent_id: parentId || null,
       visibility,
     })
@@ -162,7 +174,7 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
                   onChange={e => setPreset(key, e.target.value)}
                   className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-xs text-parchment focus:outline-none focus:border-gold/60"
                 >
-                  {PRESETS[key].map(option => (
+                  {EXTENDED_PRESETS[key].map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>

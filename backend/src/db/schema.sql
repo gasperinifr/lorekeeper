@@ -230,9 +230,12 @@ CREATE TABLE IF NOT EXISTS entity_links (
   target_type    VARCHAR(50) NOT NULL,
   target_id      UUID NOT NULL,
   relation_label VARCHAR(100),
+  relation_type  VARCHAR(50) DEFAULT 'outro',
   created_at     TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(source_type, source_id, target_type, target_id)
 );
+
+ALTER TABLE entity_links ADD COLUMN IF NOT EXISTS relation_type VARCHAR(50) DEFAULT 'outro';
 
 CREATE TABLE IF NOT EXISTS tags (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
