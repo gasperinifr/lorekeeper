@@ -105,15 +105,6 @@ VITE_API_URL=
 
 ---
 
-## Roadmap
-
-* Sistema de permissões por usuário
-* Exportação de campanhas
-* Integração com outros sistemas além do 5e Tools
-* Melhorias na IA contextual
-
----
-
 ## Licença
 
 MIT
