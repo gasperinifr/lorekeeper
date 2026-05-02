@@ -45,7 +45,14 @@ export function ArcDetailPage() {
   )
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-4xl mx-auto">
+      <Link
+        to={`/campaigns/${campaignId}`}
+        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-2 transition-colors"
+      >
+        <ArrowLeft size={12} /> Campanha
+      </Link>
+
       <Link
         to={`/campaigns/${campaignId}/arcs`}
         className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-6 transition-colors"

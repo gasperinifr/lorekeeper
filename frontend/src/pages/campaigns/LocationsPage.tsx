@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight, Map, Sparkles, Lock } from 'lucide-react'
+import { Plus, ChevronRight, Map, Sparkles, Lock, ArrowLeft, List, LayoutGrid } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useEntityList } from '@/hooks/useEntities'
@@ -90,6 +90,7 @@ export function LocationsPage() {
   const navigate = useNavigate()
   const [view, setView] = useState<'list' | 'tree'>('list')
   const [showAI, setShowAI] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
 
   const { data: list, isLoading: listLoading } = useEntityList(campaignId!, 'locations')
   const { data: campaign } = useCampaign(campaignId!)
@@ -102,8 +103,25 @@ export function LocationsPage() {
 
   const isLoading = view === 'list' ? listLoading : treeLoading
 
+  useEffect(() => {
+    const saved = localStorage.getItem('lk_entity_view_locations')
+    setViewMode(saved === 'gallery' ? 'gallery' : 'list')
+  }, [])
+
+  const changeViewMode = (mode: 'list' | 'gallery') => {
+    setViewMode(mode)
+    localStorage.setItem('lk_entity_view_locations', mode)
+  }
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <Link
+        to={`/campaigns/${campaignId}`}
+        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-3 transition-colors"
+      >
+        <ArrowLeft size={12} /> Campanha
+      </Link>
+
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Map size={22} className="text-emerald-400" />
@@ -111,6 +129,39 @@ export function LocationsPage() {
           {list && <span className="text-parchment/30 text-sm">{list.length}</span>}
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <Button size="sm" variant="ghost" onClick={() => setShowAI(true)}>
+              <Sparkles size={14} /> Gerar com IA
+            </Button>
+          )}
+
+          {view === 'list' && (
+            <div className="h-8 rounded border border-stone-300 bg-stone-100 p-0.5 flex items-center">
+              <button
+                type="button"
+                onClick={() => changeViewMode('list')}
+                className={clsx(
+                  'h-7 w-8 rounded flex items-center justify-center transition-colors',
+                  viewMode === 'list' ? 'bg-stone-300 text-gold' : 'text-parchment/35 hover:text-parchment/65'
+                )}
+                title="Modo lista"
+              >
+                <List size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => changeViewMode('gallery')}
+                className={clsx(
+                  'h-7 w-8 rounded flex items-center justify-center transition-colors',
+                  viewMode === 'gallery' ? 'bg-stone-300 text-gold' : 'text-parchment/35 hover:text-parchment/65'
+                )}
+                title="Modo galeria"
+              >
+                <LayoutGrid size={15} />
+              </button>
+            </div>
+          )}
+
           <div className="flex bg-stone-200 border border-stone-300 rounded-md p-0.5">
             {(['list', 'tree'] as const).map(v => (
               <button
@@ -125,15 +176,11 @@ export function LocationsPage() {
               </button>
             ))}
           </div>
+
           {canEdit && (
-            <>
-              <Button size="sm" variant="ghost" onClick={() => setShowAI(true)}>
-                <Sparkles size={14} /> Gerar com IA
-              </Button>
-              <Link to={`/campaigns/${campaignId}/locations/new`}>
-                <Button size="sm"><Plus size={14} /> Novo</Button>
-              </Link>
-            </>
+            <Link to={`/campaigns/${campaignId}/locations/new`}>
+              <Button size="sm"><Plus size={14} /> Novo</Button>
+            </Link>
           )}
         </div>
       </div>
@@ -149,20 +196,46 @@ export function LocationsPage() {
               action={canEdit ? { label: 'Criar local', onClick: () => navigate(`/campaigns/${campaignId}/locations/new`) } : undefined}
             />
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className={clsx('grid gap-3', viewMode === 'gallery' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1')}>
             {(list ?? []).map((loc: any) => (
               <Link key={loc.id} to={`/campaigns/${campaignId}/locations/${loc.id}`}>
-                <div className="bg-stone-100 border border-stone-300 hover:border-emerald-400/30 rounded-xl px-5 py-4 transition-colors group">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Map size={14} className="text-emerald-400" />
-                    <p className="text-sm font-medium text-parchment group-hover:text-gold transition-colors truncate">
-                      {loc.name}
-                      {loc.visibility === 'private' && <Lock size={12} className="inline ml-2 text-parchment/30" />}
-                    </p>
+                {viewMode === 'gallery' ? (
+                  <div className="bg-stone-100 border border-stone-300 hover:border-emerald-400/30 rounded-lg overflow-hidden transition-colors group h-full flex flex-col">
+                    <div className="aspect-[4/3] bg-stone-200 border-b border-stone-300 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {loc.image_url ? (
+                        <img
+                          src={loc.image_url}
+                          alt={loc.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={e => { e.currentTarget.style.display = 'none' }}
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-full border border-stone-300 bg-stone-100 flex items-center justify-center text-emerald-400">
+                          <Map size={28} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col">
+                      <p className="font-medium text-parchment text-sm group-hover:text-gold transition-colors line-clamp-2">
+                        {loc.name}
+                        {loc.visibility === 'private' && <Lock size={12} className="inline ml-2 text-parchment/30" />}
+                      </p>
+                      {loc.type && <p className="text-xs text-parchment/40 mt-1 line-clamp-2">{loc.type}</p>}
+                    </div>
                   </div>
-                  {loc.type && <p className="text-xs text-parchment/40 ml-6">{loc.type}</p>}
-                  {loc.parent_id && <p className="text-xs text-emerald-400/40 ml-6 mt-1">sub-local</p>}
-                </div>
+                ) : (
+                  <div className="bg-stone-100 border border-stone-300 hover:border-emerald-400/30 rounded-xl px-5 py-4 transition-colors group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Map size={14} className="text-emerald-400" />
+                      <p className="text-sm font-medium text-parchment group-hover:text-gold transition-colors truncate">
+                        {loc.name}
+                        {loc.visibility === 'private' && <Lock size={12} className="inline ml-2 text-parchment/30" />}
+                      </p>
+                    </div>
+                    {loc.type && <p className="text-xs text-parchment/40 ml-6">{loc.type}</p>}
+                    {loc.parent_id && <p className="text-xs text-emerald-400/40 ml-6 mt-1">sub-local</p>}
+                  </div>
+                )}
               </Link>
             ))}
           </div>

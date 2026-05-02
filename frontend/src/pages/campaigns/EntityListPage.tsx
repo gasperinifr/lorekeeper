@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid } from 'lucide-react'
+import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid, ArrowLeft } from 'lucide-react'
 import { useEntityList } from '@/hooks/useEntities'
 import { useCampaign } from '@/hooks/useCampaign'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -45,6 +45,12 @@ export function EntityListPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <Link
+        to={`/campaigns/${campaignId}`}
+        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-4 transition-colors"
+      >
+        <ArrowLeft size={12} /> Campanha
+      </Link>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
