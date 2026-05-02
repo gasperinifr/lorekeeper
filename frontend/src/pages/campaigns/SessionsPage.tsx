@@ -50,7 +50,7 @@ export function SessionsPage() {
   const canEdit = ['admin', 'editor'].includes(campaign?.role ?? '')
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-2xl text-parchment">Sessões</h1>

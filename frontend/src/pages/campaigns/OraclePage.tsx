@@ -200,7 +200,7 @@ export function OraclePage() {
             <Sparkles size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="font-display text-lg text-parchment">Oracle</h1>
+            <h1 className="font-display text-lg text-parchment">Oráculo</h1>
             <p className="text-xs text-parchment/30 truncate">IA com memoria da campanha e conversa contextual.</p>
           </div>
         </div>
@@ -247,7 +247,7 @@ export function OraclePage() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
-        <div className="max-w-4xl mx-auto flex flex-col gap-3">
+        <div className="w-full max-w-[1400px] mx-auto flex flex-col gap-3">
           {isLoading && <p className="text-sm text-parchment/30">Consultando memoria...</p>}
 
           {!isLoading && messages.length === 0 && !sendMessage.isPending && (
@@ -256,7 +256,7 @@ export function OraclePage() {
                 <Sparkles size={24} />
               </div>
               <div>
-                <h2 className="font-display text-2xl text-parchment">Pergunte ao Oracle</h2>
+                <h2 className="font-display text-2xl text-parchment">Pergunte ao Oráculo</h2>
                 <p className="text-sm text-parchment/35 mt-1 max-w-xl">
                   Ele usa Eventos, NPCs, locais, arcos, sessoes, notas e itens da campanha para responder em contexto.
                 </p>
@@ -285,7 +285,7 @@ export function OraclePage() {
                   : 'bg-stone-100 border-stone-300'
               )}>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs text-gold/75">{item.role === 'user' ? item.username ?? 'Voce' : 'Oracle'}</span>
+                  <span className="text-xs text-gold/75">{item.role === 'user' ? item.username ?? 'Você' : 'Oráculo'}</span>
                   <span className="text-[11px] text-parchment/25">
                     {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -326,7 +326,7 @@ export function OraclePage() {
       </div>
 
       <form onSubmit={submit} className="border-t border-stone-300 bg-stone-100 px-5 py-3">
-        <div className="max-w-4xl mx-auto grid grid-cols-[1fr_auto] gap-2 items-end">
+        <div className="w-full max-w-[1400px] mx-auto grid grid-cols-[1fr_auto] gap-2 items-end">
           <textarea
             value={message}
             onChange={event => setMessage(event.target.value)}

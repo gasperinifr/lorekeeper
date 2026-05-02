@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, ArrowLeft, Calendar, Clock, Lock, BookMarked } from 'lucide-react'
+import { Plus, Calendar, Clock, Lock, BookMarked } from 'lucide-react'
 import { useArcDetail, useCreateSession, useUpdateArc } from '@/hooks/useArcs'
 import { useEvents } from '@/hooks/useEvents'
 import { LinksPanel } from '@/components/entity/LinksPanel'
@@ -45,21 +45,7 @@ export function ArcDetailPage() {
   )
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <Link
-        to={`/campaigns/${campaignId}`}
-        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-2 transition-colors"
-      >
-        <ArrowLeft size={12} /> Campanha
-      </Link>
-
-      <Link
-        to={`/campaigns/${campaignId}/arcs`}
-        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-6 transition-colors"
-      >
-        <ArrowLeft size={12} /> Arcos
-      </Link>
-
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex gap-8 items-start">
         <div className="flex-1 min-w-0 max-w-3xl">
           <div className="mb-8">

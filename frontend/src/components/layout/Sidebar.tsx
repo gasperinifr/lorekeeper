@@ -25,9 +25,9 @@ const NARRATIVE_SECTIONS = [
   { label: 'Crônica',      icon: BookMarked, path: 'chronicle' },
 ]
 
-function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
+function NavItem({ to, icon: Icon, label, exact = false }: { to: string; icon: React.ElementType; label: string; exact?: boolean }) {
   const loc = useLocation()
-  const active = loc.pathname.includes(to)
+  const active = exact ? loc.pathname === to : loc.pathname.includes(to)
   return (
     <Link
       to={to}
@@ -75,9 +75,10 @@ export function Sidebar() {
               <ChevronLeft size={14} /> Todas as campanhas
             </Link>
 
+            <NavItem to={`/campaigns/${campaignId}`} icon={Home} label="Início" exact />
             <NavItem to={`/campaigns/${campaignId}/search`} icon={Search} label="Buscar" />
             <NavItem to={`/campaigns/${campaignId}/taverna`} icon={MessageSquare} label="Taverna" />
-            <NavItem to={`/campaigns/${campaignId}/oracle`} icon={Sparkles} label="Oracle" />
+            <NavItem to={`/campaigns/${campaignId}/oracle`} icon={Sparkles} label="Oráculo" />
             <NavItem to={`/campaigns/${campaignId}/relationships`} icon={Network} label="Relações" />
 
             <div className="mt-3 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">

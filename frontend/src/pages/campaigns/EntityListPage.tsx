@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid, ArrowLeft } from 'lucide-react'
+import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid } from 'lucide-react'
 import { useEntityList } from '@/hooks/useEntities'
 import { useCampaign } from '@/hooks/useCampaign'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { FiveEBrowser } from '@/components/fiveEtools/FiveEBrowser'
 import { NPCGenerator } from '@/components/ai/NPCGenerator'
+import { EntityAIGenerator } from '@/components/ai/EntityAIGenerator'
 import type { EntityType } from '@/types'
 import { clsx } from 'clsx'
 
@@ -19,6 +20,7 @@ export function EntityListPage() {
   const [search, setSearch] = useState('')
   const [showBrowser, setShowBrowser] = useState(false)
   const [showAI, setShowAI] = useState(false)
+  const [showEntityAI, setShowEntityAI] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
 
   const cfg = ENTITY_CONFIG[entityType!]
@@ -44,13 +46,7 @@ export function EntityListPage() {
   })
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <Link
-        to={`/campaigns/${campaignId}`}
-        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-4 transition-colors"
-      >
-        <ArrowLeft size={12} /> Campanha
-      </Link>
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -69,6 +65,11 @@ export function EntityListPage() {
           {canEdit && entityType === 'npcs' && (
             <Button size="sm" variant="ghost" onClick={() => setShowAI(true)}>
               <Sparkles size={14} /> Gerar com IA
+            </Button>
+          )}
+          {canEdit && ['creatures', 'items', 'spells'].includes(entityType!) && (
+            <Button size="sm" variant="ghost" onClick={() => setShowEntityAI(true)}>
+              <Sparkles size={14} /> Criar com IA
             </Button>
           )}
 
@@ -157,7 +158,7 @@ export function EntityListPage() {
                     <img
                       src={entity.image_url ?? entity.portrait_url}
                       alt={cfg.displayName(entity)}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
                       onError={e => { e.currentTarget.style.display = 'none' }}
                     />
                   ) : (
@@ -232,6 +233,15 @@ export function EntityListPage() {
         <NPCGenerator
           campaignId={campaignId!}
           onClose={() => setShowAI(false)}
+        />
+      )}
+
+      {showEntityAI && entityType && ['creatures', 'items', 'spells'].includes(entityType) && (
+        <EntityAIGenerator
+          campaignId={campaignId!}
+          entityType={entityType as 'creatures' | 'items' | 'spells'}
+          onClose={() => setShowEntityAI(false)}
+          onCreated={entityId => navigate(`/campaigns/${campaignId}/${entityType}/${entityId}`)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { Users, Skull, Map, Package, Sword, Scroll, BookOpen } from 'lucide-react'
+import { Users, Skull, Map, Sword, Bug, Scroll, BookOpen } from 'lucide-react'
 import type { EntityType } from '@/types'
 
 export interface FieldDef {
@@ -174,7 +174,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
 
   items: {
     label: 'Item', labelPlural: 'Itens',
-    icon: Package, accentClass: 'text-amber-400',
+    icon: Sword, accentClass: 'text-amber-400',
     fields: [
       { key: 'name', label: 'Nome', type: 'text', required: true },
       { key: 'type', label: 'Tipo', type: 'select',
@@ -230,7 +230,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
 
   creatures: {
     label: 'Criatura', labelPlural: 'Criaturas',
-    icon: Sword, accentClass: 'text-rose-400',
+    icon: Bug, accentClass: 'text-rose-400',
     fields: [
       { key: 'name', label: 'Nome', type: 'text', required: true },
       { key: 'type', label: 'Tipo', type: 'select',

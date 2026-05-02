@@ -555,7 +555,7 @@ export function ChroniclePage() {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="font-display text-2xl text-parchment">Crônica</h1>

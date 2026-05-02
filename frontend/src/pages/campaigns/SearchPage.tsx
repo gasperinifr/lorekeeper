@@ -80,7 +80,7 @@ export function SearchPage() {
   }, {} as Record<SearchResultType, Result[]>)
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <h1 className="font-display text-2xl text-parchment mb-6">Buscar na campanha</h1>
 
       <div className="relative mb-8">

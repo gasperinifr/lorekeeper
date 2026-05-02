@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Copy, Mail, Trash2, UserPlus } from 'lucide-react'
+import { Copy, Trash2, UserPlus } from 'lucide-react'
 import { useCampaign, useUpdateCampaign, useCreateInvite, useUpdateMember } from '@/hooks/useCampaign'
 import { Input } from '@/components/ui/Input'
 import { ImageUpload } from '@/components/ui/ImageUpload'
@@ -32,11 +32,12 @@ export function CampaignSettings() {
 
   const [form, setForm] = useState<Record<string, string>>({})
   const [codeInvite, setCodeInvite] = useState({ role: 'viewer', play_role: 'player' })
-  const [emailInvite, setEmailInvite] = useState({ email: '', role: 'viewer', play_role: 'player' })
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null)
   const [inviteError, setInviteError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedCover, setSavedCover] = useState(false)
   const [savedSnapshot, setSavedSnapshot] = useState('')
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -56,6 +57,12 @@ export function CampaignSettings() {
     setTimeout(() => setSaved(false), 2500)
   }
 
+  const saveCoverOnly = async () => {
+    await updateCampaign.mutateAsync({ cover_image_url: val('cover_image_url') })
+    setSavedCover(true)
+    setTimeout(() => setSavedCover(false), 2500)
+  }
+
   const hasUnsavedChanges = !!campaign && !!savedSnapshot && serializeSettings(currentSettings) !== savedSnapshot
   const { dialog: unsavedDialog } = useUnsavedChangesPrompt({
     when: hasUnsavedChanges && !updateCampaign.isPending,
@@ -72,15 +79,11 @@ export function CampaignSettings() {
     await saveSettings()
   }
 
-  const buildInviteEmailHref = (email: string, code: string) =>
-    `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(`Convite para ${campaign.title}`)}&body=${encodeURIComponent(`Use este codigo para entrar na campanha "${campaign.title}" no Lorekeeper:\n\n${code}`)}`
-
-  const createInviteCode = async (email?: string) => {
+  const createInviteCode = async () => {
     setInviteError('')
     setInviteResult(null)
-    const data = email ? emailInvite : codeInvite
+    const data = codeInvite
     const result = await createInvite.mutateAsync({
-      email,
       role: data.role,
       play_role: data.play_role,
     })
@@ -97,22 +100,6 @@ export function CampaignSettings() {
     }
   }
 
-  const onEmailInvite = async (e: FormEvent) => {
-    e.preventDefault()
-    const email = emailInvite.email.trim()
-    if (!email) {
-      setInviteError('Informe o email antes de preparar o convite.')
-      return
-    }
-    try {
-      const result = await createInviteCode(email)
-      setEmailInvite({ email: '', role: 'viewer', play_role: 'player' })
-      window.location.href = buildInviteEmailHref(email, result.code)
-    } catch (err: any) {
-      setInviteError(err.message)
-    }
-  }
-
   const copyInviteCode = async () => {
     if (!inviteResult) return
     await navigator.clipboard.writeText(inviteResult.code)
@@ -121,7 +108,11 @@ export function CampaignSettings() {
   }
 
   const onDelete = async () => {
-    if (!confirm('Excluir esta campanha permanentemente? Todos os dados serao perdidos.')) return
+    const expected = campaign.title.trim()
+    if (deleteConfirmName.trim() !== expected) {
+      setInviteError('Para excluir a campanha, digite o nome exato no campo de confirmacao.')
+      return
+    }
     await api.delete(`/campaigns/${campaignId}`)
     navigate('/dashboard')
   }
@@ -154,13 +145,13 @@ export function CampaignSettings() {
   return (
     <>
     {unsavedDialog}
-    <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="font-display text-2xl text-parchment mb-8">Configuracoes da campanha</h1>
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
+      <h1 className="font-display text-2xl text-parchment mb-8">Configurações da campanha</h1>
 
       <section className="mb-10">
-        <h2 className="text-xs text-parchment/30 uppercase tracking-widest mb-4">Informacoes gerais</h2>
+        <h2 className="text-xs text-parchment/30 uppercase tracking-widest mb-4">Informações gerais</h2>
         <form onSubmit={onSave} className="flex flex-col gap-4">
-          <Input label="Titulo" value={val('title')} onChange={set('title')} />
+          <Input label="Título" value={val('title')} onChange={set('title')} />
 
           <div className="flex flex-col gap-2">
             <label className="text-sm text-parchment/70 font-medium">Imagem da campanha</label>
@@ -170,10 +161,13 @@ export function CampaignSettings() {
               onUpload={url => setForm(f => ({ ...f, cover_image_url: url }))}
             />
             <Input label="URL da imagem" value={val('cover_image_url')} onChange={set('cover_image_url')} placeholder="https://..." />
+            <Button type="button" size="sm" variant="ghost" className="self-start" onClick={saveCoverOnly} loading={updateCampaign.isPending}>
+              {savedCover ? 'Imagem salva' : 'Salvar apenas imagem da capa'}
+            </Button>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-parchment/70 font-medium">Descricao</label>
+            <label className="text-sm text-parchment/70 font-medium">Descrição</label>
             <textarea
               value={val('description')}
               onChange={set('description')}
@@ -188,21 +182,21 @@ export function CampaignSettings() {
               <select value={val('status')} onChange={set('status')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
                 <option value="active">Ativa</option>
                 <option value="paused">Pausada</option>
-                <option value="completed">Concluida</option>
+                <option value="completed">Concluída</option>
               </select>
             </div>
             <div className="flex flex-col gap-1 flex-1">
               <label className="text-sm text-parchment/70 font-medium">Visibilidade</label>
               <select value={val('visibility')} onChange={set('visibility')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
                 <option value="private">Privada</option>
-                <option value="unlisted">Nao listada</option>
-                <option value="public">Publica</option>
+                <option value="unlisted">Não listada</option>
+                <option value="public">Pública</option>
               </select>
             </div>
           </div>
 
           <Button type="submit" loading={updateCampaign.isPending} size="sm" className="self-start">
-            {saved ? 'Salvo' : 'Salvar alteracoes'}
+            {saved ? 'Salvo' : 'Salvar alterações'}
           </Button>
         </form>
       </section>
@@ -256,24 +250,10 @@ export function CampaignSettings() {
           </p>
 
           <form onSubmit={onGenerateCode} className="rounded-lg border border-stone-300 bg-stone-200 p-3 flex flex-col gap-3">
-            <p className="text-xs text-parchment/40 uppercase tracking-widest">Codigo reutilizavel</p>
+            <p className="text-xs text-parchment/40 uppercase tracking-widest">Código de convite</p>
             {roleSelects(codeInvite, setCodeInvite)}
             <Button type="submit" size="sm" loading={createInvite.isPending} className="self-start">
-              Gerar codigo
-            </Button>
-          </form>
-
-          <form onSubmit={onEmailInvite} className="rounded-lg border border-stone-300 bg-stone-200 p-3 flex flex-col gap-3">
-            <p className="text-xs text-parchment/40 uppercase tracking-widest">Convite por email</p>
-            <Input
-              placeholder="email@exemplo.com"
-              type="email"
-              value={emailInvite.email}
-              onChange={e => setEmailInvite(i => ({ ...i, email: e.target.value }))}
-            />
-            {roleSelects(emailInvite, next => setEmailInvite(i => ({ ...i, ...next })))}
-            <Button type="submit" size="sm" loading={createInvite.isPending} className="self-start">
-              <Mail size={13} /> Preparar email
+              Gerar código
             </Button>
           </form>
 
@@ -281,7 +261,7 @@ export function CampaignSettings() {
           {inviteResult && (
             <div className="rounded-lg border border-gold/25 bg-gold/10 p-3 flex flex-col gap-3">
               <div>
-                <p className="text-xs text-gold/70 uppercase tracking-widest mb-1">Codigo de convite</p>
+                <p className="text-xs text-gold/70 uppercase tracking-widest mb-1">Código de convite</p>
                 <p className="font-display text-lg text-parchment tracking-wide">{inviteResult.code}</p>
                 <p className="text-xs text-parchment/35 mt-1">
                   Perfil: {roleLabels[inviteResult.role]} - Cargo: {playRoleLabels[inviteResult.play_role]} - expira em {new Date(inviteResult.expires_at).toLocaleDateString('pt-BR')}
@@ -289,15 +269,8 @@ export function CampaignSettings() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" variant="ghost" onClick={copyInviteCode}>
-                  <Copy size={13} /> {copied ? 'Copiado' : 'Copiar codigo'}
+                  <Copy size={13} /> {copied ? 'Copiado' : 'Copiar código'}
                 </Button>
-                {inviteResult.invited_email && (
-                  <a href={buildInviteEmailHref(inviteResult.invited_email, inviteResult.code)}>
-                    <Button type="button" size="sm" variant="ghost">
-                      <Mail size={13} /> Abrir email
-                    </Button>
-                  </a>
-                )}
               </div>
             </div>
           )}
@@ -307,11 +280,16 @@ export function CampaignSettings() {
       <section>
         <h2 className="text-xs text-crimson/60 uppercase tracking-widest mb-4">Zona de perigo</h2>
         <div className="bg-crimson/10 border border-crimson/20 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <p className="text-sm text-parchment font-medium">Excluir campanha</p>
-            <p className="text-xs text-parchment/40 mt-0.5">Esta acao e permanente e irreversivel.</p>
+            <p className="text-xs text-parchment/40 mt-0.5">Esta ação é permanente e irreversível.</p>
+            <Input
+              label={`Digite "${campaign.title}" para confirmar`}
+              value={deleteConfirmName}
+              onChange={e => setDeleteConfirmName(e.target.value)}
+            />
           </div>
-          <Button variant="danger" size="sm" onClick={onDelete}>
+          <Button variant="danger" size="sm" onClick={onDelete} disabled={deleteConfirmName.trim() !== campaign.title.trim()}>
             <Trash2 size={13} /> Excluir
           </Button>
         </div>

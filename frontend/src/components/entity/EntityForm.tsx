@@ -33,7 +33,7 @@ const visibilityLabels: Record<string, string> = {
 }
 
 const serializeForm = (value: unknown) => JSON.stringify(value ?? null)
-const DRAFT_TYPES: EntityType[] = ['npcs', 'locations', 'creatures', 'items']
+const DRAFT_TYPES: EntityType[] = ['npcs', 'locations', 'creatures', 'items', 'spells']
 
 function flattenEntityData(entity?: Record<string, any>) {
   if (!entity) return undefined
@@ -458,12 +458,27 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const applyDraft = (draftValues: Record<string, any>) => {
     setForm(prev => {
       const next = { ...prev }
+      const nextData = next.data && typeof next.data === 'object' && !Array.isArray(next.data)
+        ? { ...next.data }
+        : {}
+      const isBlank = (input: any) => {
+        if (input === undefined || input === null) return true
+        if (typeof input === 'string') {
+          const plain = input.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+          return plain.length === 0
+        }
+        if (Array.isArray(input)) return input.length === 0
+        return false
+      }
+
       const applyField = (key: string, value: any) => {
         if (value === undefined || value === null || value === '') return
-        const current = next[key]
-        const isEmptyArray = Array.isArray(current) && current.length === 0
-        if (current === undefined || current === null || current === '' || isEmptyArray) {
-          next[key] = value
+        const current = key.startsWith('data.')
+          ? nextData[key.slice(5)]
+          : next[key]
+        if (isBlank(current)) {
+          if (key.startsWith('data.')) nextData[key.slice(5)] = value
+          else next[key] = value
         }
       }
 
@@ -476,6 +491,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
           applyField(key, value)
         }
       }
+      next.data = nextData
       return next
     })
   }
@@ -546,7 +562,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   return (
     <>
     {unsavedDialog}
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <cfg.icon size={20} className={cfg.accentClass} />
         <div>

@@ -66,7 +66,7 @@ export function CampaignOverview() {
   const totalSessions = arcs?.reduce((acc, a) => acc + (Number(a.session_count) || 0), 0) ?? 0
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       {/* Header da campanha */}
       <div className="mb-10">
         {campaign.cover_image_url && (

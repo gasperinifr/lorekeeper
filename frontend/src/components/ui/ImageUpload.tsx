@@ -83,14 +83,14 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
         onDragOver={e => e.preventDefault()}
         className={clsx(
           'relative border border-dashed cursor-pointer transition-colors overflow-hidden',
-          preview && !compact ? 'w-fit max-w-full' : 'w-full',
+          'w-full',
           compact ? 'rounded-md min-h-0' : 'rounded-xl',
           loading ? 'border-gold/50 bg-gold/5' : 'border-stone-300 hover:border-gold/40 bg-stone-200',
         )}
         style={{ minHeight: preview && !compact ? undefined : compact ? '44px' : '120px' }}
       >
         {preview ? (
-          <div className={clsx(compact ? 'flex items-center gap-2 px-3 py-2 h-11' : 'relative inline-flex max-w-full p-2')}>
+          <div className={clsx(compact ? 'flex items-center gap-2 px-3 py-2 h-11' : 'relative flex w-full justify-center p-2')}>
             {compact ? (
               <>
                 <img src={preview} alt="Preview" className="h-full w-auto object-cover rounded" />

@@ -37,7 +37,7 @@ export function CampaignCreate() {
   }
 
   return (
-    <div className="p-8 max-w-xl mx-auto">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <h1 className="font-display text-2xl text-parchment mb-1">Nova Campanha</h1>
       <p className="text-parchment/40 text-sm mb-8">Preencha o básico — você pode expandir depois.</p>
 

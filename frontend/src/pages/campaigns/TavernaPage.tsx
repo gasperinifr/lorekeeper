@@ -130,7 +130,7 @@ export function TavernaPage() {
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {isLoading && <p className="text-sm text-parchment/30">Carregando mensagens...</p>}
-        <div className="flex flex-col gap-2 max-w-5xl mx-auto">
+        <div className="flex flex-col gap-2 w-full max-w-[1400px] mx-auto">
           {(messages ?? []).map(message => {
             const own = message.user_id === user?.id
             const canDelete = own || canModerate
@@ -183,7 +183,7 @@ export function TavernaPage() {
       </div>
 
       <form onSubmit={submit} className="border-t border-stone-300 bg-stone-100 px-5 py-3">
-        <div className="max-w-5xl mx-auto flex flex-col gap-2 relative">
+        <div className="w-full max-w-[1400px] mx-auto flex flex-col gap-2 relative">
           {mentionMenuOpen && (
             <div className="absolute bottom-full left-0 mb-2 w-full max-w-xl rounded-lg border border-stone-300 bg-stone-100 shadow-xl p-3 z-20">
               <input

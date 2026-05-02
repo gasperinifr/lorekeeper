@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight, Map, Sparkles, Lock, ArrowLeft, List, LayoutGrid } from 'lucide-react'
+import { Plus, ChevronRight, Map, Sparkles, Lock, List, LayoutGrid } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useEntityList } from '@/hooks/useEntities'
@@ -114,14 +114,7 @@ export function LocationsPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <Link
-        to={`/campaigns/${campaignId}`}
-        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-3 transition-colors"
-      >
-        <ArrowLeft size={12} /> Campanha
-      </Link>
-
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Map size={22} className="text-emerald-400" />
@@ -206,7 +199,7 @@ export function LocationsPage() {
                         <img
                           src={loc.image_url}
                           alt={loc.name}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
                           onError={e => { e.currentTarget.style.display = 'none' }}
                         />
                       ) : (

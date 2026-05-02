@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
-import { Pencil, Trash2, ArrowLeft, Link2, X } from 'lucide-react'
+import { Pencil, Trash2, Link2, X } from 'lucide-react'
 import { useEntityDetail, useDeleteEntity } from '@/hooks/useEntities'
 import { useCreateLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -161,7 +161,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
   const imageKey = entity.image_url ? 'image_url' : entity.portrait_url ? 'portrait_url' : null
 
   return (
-    <div className="p-8">
+    <div className="p-8 w-full max-w-[1400px] mx-auto">
       {suggestions.length > 0 && (
         <div className="fixed right-6 top-6 z-40 w-80 rounded-lg border border-gold/25 bg-stone-100 shadow-xl p-4 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
@@ -215,14 +215,6 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
         </div>
       )}
 
-      {/* Breadcrumb */}
-      <Link
-        to={`/campaigns/${campaignId}/${entityType}`}
-        className="inline-flex items-center gap-1.5 text-xs text-parchment/30 hover:text-parchment/60 mb-6 transition-colors"
-      >
-        <ArrowLeft size={12} /> {cfg.labelPlural}
-      </Link>
-
       <div className="flex gap-8 items-start">
         {/* Conteúdo principal */}
         <div className="flex-1 min-w-0">
@@ -274,7 +266,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
               <img
                 src={imageUrl}
                 alt={cfg.displayName(entity)}
-                className="w-full max-h-[20rem] object-cover rounded-lg border border-stone-300 bg-stone-200 mb-6"
+                className="w-full max-h-[24rem] object-contain rounded-lg border border-stone-300 bg-stone-200 mb-6"
                 onError={e => { e.currentTarget.style.display = 'none' }}
               />
             )
