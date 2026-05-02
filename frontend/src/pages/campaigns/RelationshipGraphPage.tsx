@@ -344,7 +344,7 @@ export function RelationshipGraphPage() {
             <Link2 size={22} className="text-gold" />
             <div>
               <h1 className="font-display text-2xl text-parchment">Gráfico de Relacionamentos</h1>
-              <p className="text-sm text-parchment/35">{nodes.length} nos conectados, {edges.length} relacoes</p>
+              <p className="text-sm text-parchment/35">{nodes.length} Entidades, {edges.length} Relacionamentos</p>
             </div>
           </div>
         </div>
