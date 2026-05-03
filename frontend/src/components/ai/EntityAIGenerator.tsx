@@ -91,7 +91,7 @@ export function EntityAIGenerator({ campaignId, entityType, onClose, onCreated }
         <div className="flex justify-end gap-2 pt-2">
           <Button size="sm" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button size="sm" onClick={submit} loading={draft.isPending || create.isPending}>
-            Gerar e criar
+            Gerar
           </Button>
         </div>
       </div>
