@@ -47,7 +47,7 @@ export function ArcDetailPage() {
   return (
     <div className="p-8 w-full max-w-[1400px] mx-auto">
       <div className="flex gap-8 items-start">
-        <div className="flex-1 min-w-0 max-w-3xl">
+        <div className="flex-1 min-w-0">
           <div className="mb-8">
             <div className="flex items-start justify-between gap-4 mb-2">
               <div className="flex items-center gap-2">

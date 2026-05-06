@@ -22,6 +22,22 @@ function linkableLabel(type: LinkableType) {
   return EXTRA_TYPES.find(t => t.type === type)?.label ?? type
 }
 
+function messageTimestamp(value: string) {
+  const sentAt = new Date(value)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const messageDay = new Date(sentAt.getFullYear(), sentAt.getMonth(), sentAt.getDate())
+  const diffDays = Math.round((today.getTime() - messageDay.getTime()) / 86400000)
+  const time = sentAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+  if (diffDays === 0) return `hoje ${time}`
+  if (diffDays === 1) return `ontem ${time}`
+  if (diffDays > 1 && diffDays < 7) {
+    return `${sentAt.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')} ${time}`
+  }
+  return `${sentAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${time}`
+}
+
 export function TavernaPage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const { user } = useAuth()
@@ -142,7 +158,7 @@ export function TavernaPage() {
                 )}>
                   <div className="flex items-center gap-2 mb-1">
                     {!own && <span className="text-xs text-gold/75">{message.username ?? 'Usuario'}</span>}
-                    <span className="text-[11px] text-parchment/25">{new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-[11px] text-parchment/25">{messageTimestamp(message.created_at)}</span>
                     {canDelete && (
                       <button
                         onClick={() => deleteMessage.mutate(message.id)}
