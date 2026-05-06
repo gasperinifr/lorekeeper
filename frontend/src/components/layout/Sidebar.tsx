@@ -1,7 +1,7 @@
 import { Link, useParams, useLocation } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
-  BookOpen, Map, Users, Sword, Package, Scroll,
+  BookOpen, Map, Users, Sword, Bug, Scroll,
   GitBranch, Calendar, Search, Settings, ChevronLeft,
   Skull, Home, LogOut, MessageSquare, Network, Sparkles,
   BookMarked,
@@ -13,9 +13,9 @@ const WORLD_SECTIONS = [
   { label: 'Personagens',  icon: Users,    path: 'characters' },
   { label: 'NPCs',         icon: Skull,    path: 'npcs' },
   { label: 'Locais',       icon: Map,      path: 'locations' },
-  { label: 'Itens',        icon: Package,  path: 'items' },
+  { label: 'Itens',        icon: Sword,    path: 'items' },
   { label: 'Magias',       icon: BookOpen, path: 'spells' },
-  { label: 'Criaturas',    icon: Sword,    path: 'creatures' },
+  { label: 'Criaturas',    icon: Bug,      path: 'creatures' },
   { label: 'Notas',        icon: Scroll,   path: 'notes' },
 ]
 

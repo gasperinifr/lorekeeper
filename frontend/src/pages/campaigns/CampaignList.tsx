@@ -92,9 +92,9 @@ export function CampaignList() {
             <Link key={c.id} to={`/campaigns/${c.id}`}>
               <div className="bg-stone-100 border border-stone-300 rounded-xl p-5 hover:border-gold/40 transition-colors group">
                 {/* Cover placeholder */}
-                <div className="h-40 rounded bg-stone-200 mb-4 flex items-center justify-center overflow-hidden">
+                <div className="aspect-video rounded bg-stone-200 mb-4 flex items-center justify-center overflow-hidden">
                   {c.cover_image_url
-                    ? <img src={c.cover_image_url} alt={c.title} className="w-full h-full object-cover" />
+                    ? <img src={c.cover_image_url} alt={c.title} className="w-full h-full object-contain" />
                     : <BookOpen size={28} className="text-parchment/20" />
                   }
                 </div>

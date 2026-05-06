@@ -107,7 +107,7 @@ export async function campaignRoutes(fastify) {
   })
 
   fastify.patch('/:campaignId', { preHandler: requireEditor }, async (req, reply) => {
-    const fields = ['title','description','scenario_type','status','visibility','cover_image_url','started_at','estimated_end_at']
+    const fields = ['title','description','scenario_type','status','visibility','cover_image_url','hub_banner_url','hub_banner_fit','hub_banner_position','started_at','estimated_end_at']
     const updates = []; const vals = []; let i = 1
     for (const f of fields) {
       if (req.body[f] !== undefined) { updates.push(`${f}=$${i++}`); vals.push(req.body[f]) }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Upload, X } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ImageCropEditor } from './ImageCropEditor'
+import { IMAGE_SPECS, ImageRole, inferImageRole } from '@/config/imageSystem'
 
 interface Props {
   currentUrl?: string
@@ -10,14 +11,18 @@ interface Props {
   className?: string
   compact?: boolean
   enableCrop?: boolean
+  role?: ImageRole
+  fieldKey?: string
 }
 
-export function ImageUpload({ currentUrl, context, onUpload, className, compact = false, enableCrop = true }: Props) {
+export function ImageUpload({ currentUrl, context, onUpload, className, compact = false, enableCrop = true, role, fieldKey }: Props) {
   const [preview, setPreview] = useState(currentUrl)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [cropSrc, setCropSrc] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const imageRole = role ?? inferImageRole(context, fieldKey)
+  const spec = IMAGE_SPECS[imageRole]
 
   useEffect(() => {
     setPreview(currentUrl || undefined)
@@ -83,7 +88,8 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
         onDragOver={e => e.preventDefault()}
         className={clsx(
           'relative border border-dashed cursor-pointer transition-colors overflow-hidden',
-          'w-full',
+          preview && !compact ? 'mx-auto' : 'w-full',
+          preview && !compact ? spec.previewClass : '',
           compact ? 'rounded-md min-h-0' : 'rounded-xl',
           loading ? 'border-gold/50 bg-gold/5' : 'border-stone-300 hover:border-gold/40 bg-stone-200',
         )}
@@ -97,7 +103,7 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
                 <span className="text-xs text-parchment/55 flex-1 truncate">Imagem anexada</span>
               </>
             ) : (
-              <img src={preview} alt="Preview" className="block max-h-64 max-w-full w-auto h-auto object-contain rounded bg-stone-300" />
+              <img src={preview} alt="Preview" className={clsx('block object-contain rounded bg-stone-300', spec.previewImageClass)} />
             )}
             <button
               type="button"
@@ -117,6 +123,7 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
               : <>
                   <Upload size={compact ? 15 : 20} className="text-parchment/30" />
                   <p className="text-xs text-parchment/40">Clique ou arraste uma imagem</p>
+                  {!compact && <p className="text-xs text-parchment/25">{spec.hint}</p>}
                   {!compact && <p className="text-xs text-parchment/25">JPEG, PNG ou WebP - max. 5MB</p>}
                 </>
             }
@@ -140,6 +147,7 @@ export function ImageUpload({ currentUrl, context, onUpload, className, compact 
           onUseOriginal={blob => uploadBlob(blob, 'original.webp').then(() => setCropSrc(''))}
           onCancel={() => setCropSrc('')}
           loading={loading}
+          defaultMode="original"
         />
       )}
     </div>

@@ -153,7 +153,7 @@ function Structured5eEditor({ type, data, setData }: {
   data: Record<string, any>
   setData: (key: string, value: any) => void
 }) {
-  if (type === 'creatures' && data.statBlock) {
+  if (type === 'creatures') {
     return (
       <section className="rounded-xl border border-gold/25 bg-stone-100 p-5 flex flex-col gap-5">
         <div>
@@ -193,7 +193,7 @@ function Structured5eEditor({ type, data, setData }: {
     )
   }
 
-  if (type === 'spells' && data.spellBlock) {
+  if (type === 'spells') {
     return (
       <section className="rounded-xl border border-cyan-300/25 bg-stone-100 p-5 flex flex-col gap-5">
         <div>
@@ -214,7 +214,7 @@ function Structured5eEditor({ type, data, setData }: {
     )
   }
 
-  if (type === 'items' && data.itemBlock) {
+  if (type === 'items') {
     return (
       <section className="rounded-xl border border-amber-300/25 bg-stone-100 p-5 flex flex-col gap-5">
         <div>
@@ -400,7 +400,19 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
 
   const set = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }))
   const setData = (key: string, val: any) =>
-    setForm(f => ({ ...f, data: { ...(f.data ?? {}), [key]: val } }))
+    setForm(f => ({
+      ...f,
+      [`data.${key}`]: f[`data.${key}`] !== undefined ? val : f[`data.${key}`],
+      data: { ...(f.data ?? {}), [key]: val },
+    }))
+
+  const structuredData = useMemo(() => {
+    const data = form.data && typeof form.data === 'object' ? { ...form.data } : {}
+    for (const [key, value] of Object.entries(form)) {
+      if (key.startsWith('data.')) data[key.slice(5)] = value
+    }
+    return data
+  }, [form])
 
   const buildPayload = () => {
     const payload: Record<string, any> = {}
@@ -413,9 +425,10 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     if (type === 'locations' && payload.parent_id === '') payload.parent_id = null
     if (payload.visibility !== 'user') payload.shared_with_user_id = null
     if (payload.visibility === 'user' && payload.shared_with_user_id === '') payload.shared_with_user_id = null
-    if (type === 'spells' && payload.data?.spellBlock) {
+    if (type === 'spells') {
       payload.data = {
         ...payload.data,
+        spellBlock: true,
         school: payload.school ?? payload.data.school,
         castingTime: payload.casting_time ?? payload.data.castingTime,
         range: payload.range ?? payload.data.range,
@@ -423,13 +436,20 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
         duration: payload.duration ?? payload.data.duration,
       }
     }
-    if (type === 'items' && payload.data?.itemBlock) {
+    if (type === 'items') {
       payload.data = {
         ...payload.data,
+        itemBlock: true,
         type: payload.type ?? payload.data.type,
         rarity: payload.rarity ?? payload.data.rarity,
         entries: payload.description ?? payload.data.entries,
         propertiesText: payload.properties ?? payload.data.propertiesText,
+      }
+    }
+    if (type === 'creatures') {
+      payload.data = {
+        ...payload.data,
+        statBlock: true,
       }
     }
     return payload
@@ -780,6 +800,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             <ImageUpload
               currentUrl={form[imageField.key]}
               context={type}
+              fieldKey={imageField.key}
               onUpload={url => set(imageField.key, url)}
             />
             <Input
@@ -800,7 +821,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
           />
         ))}
 
-        <Structured5eEditor type={type} data={form.data ?? {}} setData={setData} />
+        <Structured5eEditor type={type} data={structuredData} setData={setData} />
 
         {type === 'npcs' && (
           <div className="flex flex-col gap-1">

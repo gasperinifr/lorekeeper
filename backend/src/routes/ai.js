@@ -28,12 +28,13 @@ Locais: ${locs.rows.map(r => `${r.name} (${r.type})`).join(', ') || 'nenhum'}`
 
   const SYSTEM = `Voce e um assistente especialista em D&D 5e e narrativa de RPG de mesa.
 REGRAS OBRIGATORIAS:
-- Responda SEMPRE em portugues brasileiro
+- Responda SEMPRE em portugues brasileiro natural, com acentos, cedilha e concordancia correta
 - Quando pedido JSON, retorne APENAS o JSON, sem texto antes, sem blocos de codigo
 - O JSON deve ser valido e parseable com JSON.parse()
 - Seja criativo e coerente com o mundo da campanha
 - Para conteudo de criaturas, itens e magias, siga as convencoes oficiais de D&D 5e (SRD): nomenclaturas, escalas e coerencia mecanica
 - Nao invente mecanicas absurdas ou contraditorias (ex.: CR 1 com dano de boss lendario)
+- Nunca use frases vagas como "sofre efeitos adicionais", "efeitos especiais" ou "algo acontece" sem descrever exatamente dano, condicao, duracao, teste de resistencia e efeito
 - Se faltar dado exato, prefira completar com um valor plausivel e claramente padrao de 5e`
 
   function aiErrorMessage(err) {
@@ -144,11 +145,14 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
       const DND_5E_RULES = `
 REGRAS TECNICAS 5e:
 - Criaturas: use CR plausivel para ameaca, valores coerentes de CA/PV/deslocamento e atributos STR/DEX/CON/INT/WIS/CHA de 1 a 30.
+- Criaturas: a ficha deve ter tracos e acoes jogaveis. Cada acao de ataque precisa dizer tipo de ataque, bonus para acertar, alcance, alvo e dano.
 - Itens: respeite raridade e tipo. Evite poderes quebrados para raridades baixas.
 - Magias: respeite nivel (0-9), escola, componentes e duracao em formato comum de 5e.
+- Magias: o efeito deve especificar alvo/area, teste de resistencia ou ataque, dano com tipo, condicao aplicada se houver, duracao e o que acontece em sucesso/falha.
 - Estrutura: sempre incluir um campo "data" quando houver detalhes mecanicos.
 - Nao deixe campos vazios no JSON final. Se nao houver dado canonico, preencha com uma opcao plausivel e neutra.
 - Priorize termos de regra do SRD 5e.
+- Escreva todos os textos mecanicos em portugues brasileiro com acentos. Evite portugues literal/truncado.
 `
       const PROMPTS = {
         npcs: `Crie um rascunho para o NPC chamado "${name}".${direction}
@@ -165,22 +169,22 @@ ${DND_5E_RULES}
 Exemplo de formato valido:
 {"type":"Monstruosidade","cr":"5","description":"Predador de ruinas antigas.","data":{"statBlock":true,"ac":"15 (armadura natural)","hpText":"95 (10d10+40)","speedText":"9 m, escalada 6 m","str":18,"dex":14,"con":18,"int":8,"wis":12,"cha":10,"senses":"visao no escuro 18 m, Percepcao passiva 11","languages":"compreende Comum, mas nao fala","resist":"frio","immune":"","vulnerable":"","conditionImmune":"","traits":[{"name":"Faro Aguçado","text":"Vantagem em testes de Sabedoria (Percepcao) que dependam de olfato."}],"actions":[{"name":"Multiataque","text":"A criatura realiza dois ataques de garra."}],"bonus":[],"reactions":[],"legendary":[]}}
 Retorne JSON:
-{"type":"Aberracao|Besta|Celestial|Construto|Dragao|Elemental|Fada|Fiend|Gigante|Humanoide|Morto-Vivo|Monstruosidade|Planta|Slime|Outro","cr":"...","description":"...","data":{"behavior":"...","habitat":"...","threat_level":3,"tactics":"...","weaknesses":"...","loot":"...","dm_notes":"...","statBlock":true,"ac":"...","hpText":"...","speedText":"...","str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10,"senses":"...","languages":"...","resist":"...","immune":"...","vulnerable":"...","conditionImmune":"...","traits":[{"name":"...","text":"..."}],"actions":[{"name":"...","text":"..."}],"bonus":[{"name":"...","text":"..."}],"reactions":[{"name":"...","text":"..."}],"legendary":[{"name":"...","text":"..."}]}}
-IMPORTANTE: preencha todos os campos; use listas vazias [] quando nao houver entradas. Maximo 2 frases por campo.`,
+{"type":"Aberracao|Besta|Celestial|Construto|Dragao|Elemental|Fada|Fiend|Gigante|Humanoide|Morto-Vivo|Monstruosidade|Planta|Slime|Outro","cr":"...","description":"...","data":{"behavior":"...","habitat":"...","tactics":"...","weaknesses":"...","loot":"...","dm_notes":"...","statBlock":true,"ac":"...","hpText":"...","speedText":"...","str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10,"senses":"...","languages":"...","resist":"...","immune":"...","vulnerable":"...","conditionImmune":"...","traits":[{"name":"...","text":"..."}],"actions":[{"name":"...","text":"..."}],"bonus":[{"name":"...","text":"..."}],"reactions":[{"name":"...","text":"..."}],"legendary":[{"name":"...","text":"..."}]}}
+IMPORTANTE: preencha todos os campos; use listas vazias [] quando nao houver entradas. Maximo 2 frases por campo. Toda acao deve ser resolvivel na mesa sem interpretacao extra.`,
         items: `Crie um rascunho para o item chamado "${name}".${direction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"type":"Arma","rarity":"Raro","description":"Lamina curta com runas de trovão.","properties":"finesse, leve","data":{"itemBlock":true,"weight":1.5,"valueText":"2.000 po","damage":"1d6 perfurante + 1d4 trovao","propertiesText":"finesse, leve","entries":"Quando acerta um ataque, o alvo sofre +1d4 de dano de trovão.","requiresAttunement":false,"appearance":"Aco azulado com runas brilhantes.","history":"Forjada por um anão dos picos.","curse":"","dm_notes":""}}
 Retorne JSON:
 {"type":"Arma|Armadura|Artefato|Consumivel|Ferramenta|Tesouro|Outro","rarity":"Comum|Incomum|Raro|Muito Raro|Lendario|Artefato","description":"...","properties":"...","data":{"appearance":"...","history":"...","curse":"...","dm_notes":"...","itemBlock":true,"weight":0,"valueText":"...","damage":"...","propertiesText":"...","entries":"...","requiresAttunement":false}}
-IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo.`,
+IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo. Nao escreva efeito vago: todo dano, condicao, alvo, area, duracao e teste devem estar definidos.`,
         spells: `Crie um rascunho para a magia chamada "${name}".${direction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"level":3,"school":"Evocacao","casting_time":"1 acao","range":"18 m","components":"V,S,M (um fio de cobre)","duration":"Instantanea","description":"Um raio atinge um alvo visivel.","data":{"spellBlock":true,"castingTime":"1 acao","range":"18 m","componentsText":"V,S,M (um fio de cobre)","duration":"Instantanea","damageInflict":"trovao","savingThrow":"Constituicao","entries":"O alvo faz um teste de resistencia de Constituicao.","higherLevel":[{"name":"Em niveis superiores","text":"O dano aumenta em 1d8 por nivel acima do 3º."}]}}
 Retorne JSON:
 {"level":0,"school":"Abjuracao|Conjuracao|Adivinhacao|Encantamento|Evocacao|Ilusao|Necromancia|Transmutacao","casting_time":"...","range":"...","components":"...","duration":"...","description":"...","data":{"spellBlock":true,"castingTime":"...","range":"...","componentsText":"...","duration":"...","damageInflict":"...","savingThrow":"...","entries":"...","higherLevel":[{"name":"Em niveis superiores","text":"..."}]}}
-IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo.`,
+IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo. Nao escreva efeito vago: todo dano, condicao, alvo, area, duracao e teste devem estar definidos.`,
       }
 
       const prompt = PROMPTS[entity_type]

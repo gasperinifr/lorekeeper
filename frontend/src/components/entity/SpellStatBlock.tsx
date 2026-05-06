@@ -19,19 +19,25 @@ function Fact({ icon: Icon, label, value }: {
 export function SpellStatBlock({ spell }: { spell: any }) {
   const data = spell.data ?? {}
   const hasMeta = data.ritual || data.concentration || data.damageInflict || data.savingThrow
+  const headerFacts = [
+    ['Tempo', data.castingTime ?? spell.casting_time],
+    ['Alcance', data.range ?? spell.range],
+    ['Duracao', data.duration ?? spell.duration],
+    ['Teste', data.savingThrow],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '')
 
   return (
     <div className="rounded-lg border border-cyan-300/20 bg-stone-100 overflow-hidden">
-      <div className="flex flex-col md:flex-row gap-5 p-5 border-b border-stone-300 bg-stone-200/60">
+      <div className="flex flex-col md:flex-row items-start gap-5 p-5 border-b border-stone-300 bg-stone-200/60">
         {spell.image_url && (
           <img
             src={spell.image_url}
             alt={spell.name}
-            className="w-full md:w-40 max-h-64 md:max-h-40 rounded-md object-contain border border-cyan-300/30 bg-stone-300"
+            className="w-full md:w-40 max-h-64 md:max-h-40 rounded-md object-contain border border-cyan-300/30 bg-stone-300 shrink-0"
             onError={e => { e.currentTarget.style.display = 'none' }}
           />
         )}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span className="text-xs px-2 py-1 rounded border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
               {data.levelText ?? (spell.level === 0 ? 'Truque' : `Nível ${spell.level}`)}
@@ -52,6 +58,16 @@ export function SpellStatBlock({ spell }: { spell: any }) {
               data.classes?.length ? data.classes.join(', ') : null,
             ].filter(Boolean).join(' · ')}
           </p>
+          {headerFacts.length > 0 && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {headerFacts.map(([label, value]) => (
+                <div key={String(label)} className="rounded border border-cyan-300/15 bg-stone-100 px-3 py-2">
+                  <p className="text-[11px] text-parchment/35 uppercase tracking-widest">{label}</p>
+                  <p className="text-xs text-parchment/75 mt-1 truncate">{String(value)}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

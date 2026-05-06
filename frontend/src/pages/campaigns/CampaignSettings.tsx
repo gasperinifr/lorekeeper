@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Copy, Trash2, UserPlus } from 'lucide-react'
+import { Copy, SlidersHorizontal, Trash2, UserPlus, X } from 'lucide-react'
 import { useCampaign, useUpdateCampaign, useCreateInvite, useUpdateMember } from '@/hooks/useCampaign'
 import { Input } from '@/components/ui/Input'
 import { ImageUpload } from '@/components/ui/ImageUpload'
@@ -19,14 +19,100 @@ type InviteResult = {
 
 const roleLabels: Record<string, string> = { viewer: 'Viewer', editor: 'Editor', admin: 'Admin' }
 const playRoleLabels: Record<string, string> = { player: 'Jogador', gm: 'Mestre' }
-const editableCampaignKeys = ['title', 'cover_image_url', 'description', 'status', 'visibility']
+const editableCampaignKeys = ['title', 'description', 'status', 'visibility']
 const serializeSettings = (value: unknown) => JSON.stringify(value ?? null)
+
+type BannerFit = 'cover' | 'contain'
+
+function BannerDisplayDialog({
+  imageUrl,
+  fit,
+  position,
+  onFitChange,
+  onPositionChange,
+  onClose,
+  onSave,
+  saving,
+}: {
+  imageUrl: string
+  fit: string
+  position: string
+  onFitChange: (value: string) => void
+  onPositionChange: (value: string) => void
+  onClose: () => void
+  onSave: () => void
+  saving: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-xl border border-stone-300 bg-stone-100 shadow-xl p-5 flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-display text-lg text-parchment">Exibição do banner no Hub</h3>
+            <p className="text-xs text-parchment/35 mt-1">Ajusta apenas como o banner aparece na tela inicial da campanha.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-parchment/35 hover:text-parchment transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="h-56 rounded-lg overflow-hidden bg-stone-200 border border-stone-300 flex items-center justify-center">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt="Previa do banner"
+              className={clsx('h-full w-full', fit === 'cover' ? 'object-cover' : 'object-contain')}
+              style={{ objectPosition: position }}
+            />
+          ) : (
+            <p className="text-xs text-parchment/30">Sem imagem para pré-visualizar.</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-parchment/70 font-medium">Encaixe</label>
+            <select
+              value={fit}
+              onChange={e => onFitChange(e.target.value)}
+              className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60"
+            >
+              <option value="cover">Preencher o banner</option>
+              <option value="contain">Mostrar imagem inteira</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-parchment/70 font-medium">Foco</label>
+            <select
+              value={position}
+              onChange={e => onPositionChange(e.target.value)}
+              className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60"
+            >
+              <option value="center">Centro</option>
+              <option value="top">Topo</option>
+              <option value="bottom">Base</option>
+              <option value="left">Esquerda</option>
+              <option value="right">Direita</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button type="button" size="sm" onClick={onSave} loading={saving}>Salvar banner</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function CampaignSettings() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const { data: campaign, isLoading } = useCampaign(campaignId!)
   const updateCampaign = useUpdateCampaign(campaignId!)
+  const updateCoverCampaign = useUpdateCampaign(campaignId!)
+  const updateHubBannerCampaign = useUpdateCampaign(campaignId!)
   const createInvite = useCreateInvite(campaignId!)
   const updateMember = useUpdateMember(campaignId!)
 
@@ -35,32 +121,62 @@ export function CampaignSettings() {
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null)
   const [inviteError, setInviteError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
   const [savedCover, setSavedCover] = useState(false)
+  const [savedHubBanner, setSavedHubBanner] = useState(false)
   const [savedSnapshot, setSavedSnapshot] = useState('')
+  const [coverSnapshot, setCoverSnapshot] = useState('')
+  const [hubBannerSnapshot, setHubBannerSnapshot] = useState('')
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [showBannerDisplay, setShowBannerDisplay] = useState(false)
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 
   const val = (k: string) => form[k] ?? (campaign as any)?.[k] ?? ''
   const currentSettings = Object.fromEntries(editableCampaignKeys.map(key => [key, val(key)]))
+  const currentCover = val('cover_image_url')
+  const currentHubBanner = val('hub_banner_url')
+  const currentHubBannerFit = val('hub_banner_fit') || 'cover'
+  const currentHubBannerPosition = val('hub_banner_position') || 'center'
 
   useEffect(() => {
-    if (campaign && !savedSnapshot) setSavedSnapshot(serializeSettings(currentSettings))
-  }, [campaign, currentSettings, savedSnapshot])
+    if (!campaign) return
+    if (!savedSnapshot) setSavedSnapshot(serializeSettings(currentSettings))
+    if (!coverSnapshot) setCoverSnapshot(serializeSettings(currentCover))
+    if (!hubBannerSnapshot) setHubBannerSnapshot(serializeSettings({ currentHubBanner, currentHubBannerFit, currentHubBannerPosition }))
+  }, [campaign, currentSettings, currentCover, currentHubBanner, currentHubBannerFit, currentHubBannerPosition, savedSnapshot, coverSnapshot, hubBannerSnapshot])
 
   const saveSettings = async () => {
-    await updateCampaign.mutateAsync(form)
+    await updateCampaign.mutateAsync({
+      title: val('title'),
+      description: val('description'),
+      status: val('status') as 'active' | 'paused' | 'completed',
+      visibility: val('visibility') as 'private' | 'unlisted' | 'public',
+    })
     setSavedSnapshot(serializeSettings(currentSettings))
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const saveCoverOnly = async () => {
-    await updateCampaign.mutateAsync({ cover_image_url: val('cover_image_url') })
+    await updateCoverCampaign.mutateAsync({ cover_image_url: currentCover })
+    setCoverSnapshot(serializeSettings(currentCover))
     setSavedCover(true)
     setTimeout(() => setSavedCover(false), 2500)
+  }
+
+  const saveHubBannerOnly = async () => {
+    await updateHubBannerCampaign.mutateAsync({
+      hub_banner_url: currentHubBanner,
+      hub_banner_fit: currentHubBannerFit as BannerFit,
+      hub_banner_position: currentHubBannerPosition,
+    })
+    setHubBannerSnapshot(serializeSettings({ currentHubBanner, currentHubBannerFit, currentHubBannerPosition }))
+    setSavedHubBanner(true)
+    setTimeout(() => setSavedHubBanner(false), 2500)
   }
 
   const hasUnsavedChanges = !!campaign && !!savedSnapshot && serializeSettings(currentSettings) !== savedSnapshot
@@ -108,9 +224,10 @@ export function CampaignSettings() {
   }
 
   const onDelete = async () => {
+    setDeleteError('')
     const expected = campaign.title.trim()
     if (deleteConfirmName.trim() !== expected) {
-      setInviteError('Para excluir a campanha, digite o nome exato no campo de confirmacao.')
+      setDeleteError('Para excluir a campanha, digite o nome exato no campo de confirmacao.')
       return
     }
     await api.delete(`/campaigns/${campaignId}`)
@@ -145,6 +262,18 @@ export function CampaignSettings() {
   return (
     <>
     {unsavedDialog}
+    {showBannerDisplay && (
+      <BannerDisplayDialog
+        imageUrl={currentHubBanner || currentCover}
+        fit={currentHubBannerFit}
+        position={currentHubBannerPosition}
+        onFitChange={value => setForm(f => ({ ...f, hub_banner_fit: value }))}
+        onPositionChange={value => setForm(f => ({ ...f, hub_banner_position: value }))}
+        onClose={() => setShowBannerDisplay(false)}
+        onSave={() => saveHubBannerOnly().then(() => setShowBannerDisplay(false))}
+        saving={updateHubBannerCampaign.isPending}
+      />
+    )}
     <div className="p-8 w-full max-w-[1400px] mx-auto">
       <h1 className="font-display text-2xl text-parchment mb-8">Configurações da campanha</h1>
 
@@ -153,18 +282,49 @@ export function CampaignSettings() {
         <form onSubmit={onSave} className="flex flex-col gap-4">
           <Input label="Título" value={val('title')} onChange={set('title')} />
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm text-parchment/70 font-medium">Imagem da campanha</label>
-            <ImageUpload
-              currentUrl={val('cover_image_url')}
-              context="campaigns"
-              onUpload={url => setForm(f => ({ ...f, cover_image_url: url }))}
-            />
-            <Input label="URL da imagem" value={val('cover_image_url')} onChange={set('cover_image_url')} placeholder="https://..." />
-            <Button type="button" size="sm" variant="ghost" className="self-start" onClick={saveCoverOnly} loading={updateCampaign.isPending}>
-              {savedCover ? 'Imagem salva' : 'Salvar apenas imagem da capa'}
-            </Button>
-          </div>
+          <section className="rounded-xl border border-stone-300 bg-stone-100 p-4 flex flex-col gap-4">
+            <div>
+              <h3 className="text-sm text-parchment font-medium">Imagens da campanha</h3>
+              <p className="text-xs text-parchment/35 mt-1">A capa aparece nos cards. O banner controla somente o topo do Hub da campanha.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+              <div className="rounded-lg border border-stone-300 bg-stone-200/40 p-4 flex flex-col gap-2">
+                <label className="text-sm text-parchment/70 font-medium">Imagem da capa</label>
+                <ImageUpload
+                  currentUrl={val('cover_image_url')}
+                  context="campaigns"
+                  fieldKey="cover_image_url"
+                  className="campaign-settings-image-upload"
+                  onUpload={url => setForm(f => ({ ...f, cover_image_url: url }))}
+                />
+                <Input label="URL da capa" value={val('cover_image_url')} onChange={set('cover_image_url')} placeholder="https://..." />
+                <Button type="button" size="sm" className="self-start" onClick={saveCoverOnly} loading={updateCoverCampaign.isPending}>
+                  {savedCover ? 'Imagem salva' : 'Salvar imagem da capa'}
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-stone-300 bg-stone-200/40 p-4 flex flex-col gap-2 min-w-0">
+                <label className="text-sm text-parchment/70 font-medium">Banner do Hub</label>
+                <ImageUpload
+                  currentUrl={val('hub_banner_url')}
+                  context="campaign-banners"
+                  fieldKey="hub_banner_url"
+                  className="campaign-settings-image-upload"
+                  onUpload={url => setForm(f => ({ ...f, hub_banner_url: url }))}
+                />
+                <Input label="URL do banner" value={val('hub_banner_url')} onChange={set('hub_banner_url')} placeholder="https://..." />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" className="self-start" onClick={saveHubBannerOnly} loading={updateHubBannerCampaign.isPending}>
+                    {savedHubBanner ? 'Banner salvo' : 'Salvar banner do Hub'}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setShowBannerDisplay(true)} disabled={!currentHubBanner && !currentCover}>
+                    <SlidersHorizontal size={13} /> Exibição no Hub
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <div className="flex flex-col gap-1">
             <label className="text-sm text-parchment/70 font-medium">Descrição</label>
@@ -279,19 +439,49 @@ export function CampaignSettings() {
 
       <section>
         <h2 className="text-xs text-crimson/60 uppercase tracking-widest mb-4">Zona de perigo</h2>
-        <div className="bg-crimson/10 border border-crimson/20 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div className="flex-1">
+        <div className="bg-crimson/10 border border-crimson/20 rounded-xl p-4 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
             <p className="text-sm text-parchment font-medium">Excluir campanha</p>
             <p className="text-xs text-parchment/40 mt-0.5">Esta ação é permanente e irreversível.</p>
+          </div>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={() => setDeleteArmed(true)}
+            className="self-start sm:self-auto"
+          >
+            <Trash2 size={13} /> Excluir campanha
+          </Button>
+        </div>
+        {deleteArmed && (
+          <div className="rounded-lg border border-crimson/25 bg-ink/25 p-4 flex flex-col gap-3">
             <Input
               label={`Digite "${campaign.title}" para confirmar`}
               value={deleteConfirmName}
               onChange={e => setDeleteConfirmName(e.target.value)}
             />
+            {deleteError && <p className="text-xs text-crimson-light">{deleteError}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="danger" size="sm" onClick={onDelete} disabled={deleteConfirmName.trim() !== campaign.title.trim()}>
+                <Trash2 size={13} /> Excluir permanentemente
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeleteArmed(false)
+                  setDeleteConfirmName('')
+                  setDeleteError('')
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
           </div>
-          <Button variant="danger" size="sm" onClick={onDelete} disabled={deleteConfirmName.trim() !== campaign.title.trim()}>
-            <Trash2 size={13} /> Excluir
-          </Button>
+        )}
         </div>
       </section>
     </div>

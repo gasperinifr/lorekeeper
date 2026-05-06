@@ -96,4 +96,17 @@
     border: 1px solid rgb(201 192 170 / 0.18);
     background: #2b261c;
   }
+
+  .campaign-settings-image-upload > div:first-child {
+    width: 100%;
+    height: 18.5rem;
+  }
+
+  .campaign-settings-image-upload > div:first-child > div {
+    height: 100%;
+  }
+
+  .campaign-settings-image-upload img {
+    max-height: 100%;
+  }
 }

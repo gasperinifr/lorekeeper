@@ -15,6 +15,9 @@ export interface Campaign {
   status: 'active' | 'paused' | 'completed'
   visibility: 'private' | 'unlisted' | 'public'
   cover_image_url?: string
+  hub_banner_url?: string
+  hub_banner_fit?: 'cover' | 'contain'
+  hub_banner_position?: string
   started_at?: string
   estimated_end_at?: string
   member_count?: number

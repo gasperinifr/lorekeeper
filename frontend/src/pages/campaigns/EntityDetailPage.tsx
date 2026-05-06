@@ -128,10 +128,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
   if (!entity || !cfg) return <div className="p-8 text-crimson-light text-sm">Entidade não encontrada.</div>
 
-  const hasStructuredBlock =
-    (entityType === 'creatures' && entity.data?.statBlock) ||
-    (entityType === 'spells' && entity.data?.spellBlock) ||
-    (entityType === 'items' && entity.data?.itemBlock)
+  const hasStructuredBlock = ['creatures', 'spells', 'items'].includes(entityType!)
   const structuredMeta = ['type','cr','level','school','casting_time','range','duration','components','rarity','properties']
   const sectionFields = cfg.sections?.flatMap(section => section.fields) ?? []
   const sectionFieldKeys = new Set(sectionFields.map(field => field.key))
@@ -295,13 +292,13 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
 
           {/* Campos de texto */}
           <div className="flex flex-col gap-6">
-            {entityType === 'creatures' && entity.data?.statBlock && (
+            {entityType === 'creatures' && (
               <CreatureStatBlock creature={entity} />
             )}
-            {entityType === 'spells' && entity.data?.spellBlock && (
+            {entityType === 'spells' && (
               <SpellStatBlock spell={entity} />
             )}
-            {entityType === 'items' && entity.data?.itemBlock && (
+            {entityType === 'items' && (
               <ItemStatBlock item={entity} />
             )}
 

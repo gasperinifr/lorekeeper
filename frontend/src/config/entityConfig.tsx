@@ -31,6 +31,20 @@ const VISIBILITY_FIELD: FieldDef = {
   optionLabels: { public: 'Publica', private: 'Privada' },
 }
 
+const DND_CLASSES = [
+  'Barbaro', 'Bardo', 'Bruxo', 'Clerigo', 'Druida', 'Feiticeiro',
+  'Guerreiro', 'Ladino', 'Mago', 'Monge', 'Paladino', 'Patrulheiro',
+]
+
+const DND_ABILITIES: FieldDef[] = [
+  { key: 'data.str', label: 'Forca', type: 'number', placeholder: '10' },
+  { key: 'data.dex', label: 'Destreza', type: 'number', placeholder: '10' },
+  { key: 'data.con', label: 'Constituicao', type: 'number', placeholder: '10' },
+  { key: 'data.int', label: 'Inteligencia', type: 'number', placeholder: '10' },
+  { key: 'data.wis', label: 'Sabedoria', type: 'number', placeholder: '10' },
+  { key: 'data.cha', label: 'Carisma', type: 'number', placeholder: '10' },
+]
+
 export interface EntityConfig {
   label: string
   labelPlural: string
@@ -49,8 +63,8 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
     icon: Users, accentClass: 'text-sky-400',
     fields: [
       { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'race', label: 'Raca', type: 'text' },
-      { key: 'class', label: 'Classe', type: 'text' },
+      { key: 'race', label: 'Raca / linhagem', type: 'text', placeholder: 'Humano, elfo, anao...' },
+      { key: 'class', label: 'Classe', type: 'select', options: DND_CLASSES },
       { key: 'level', label: 'Nivel', type: 'number', placeholder: '1' },
       { key: 'portrait_url', label: 'Imagem', type: 'text' },
       VISIBILITY_FIELD,
@@ -62,11 +76,29 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
         key: 'background', label: 'Historia & Tracos',
         defaultCollapsed: false,
         fields: [
+          { key: 'data.background', label: 'Antecedente', type: 'text', placeholder: 'Acolito, criminoso, erudito...' },
           { key: 'backstory', label: 'Historia', type: 'textarea', rows: 5 },
           { key: 'data.personality_traits', label: 'Tracos de personalidade', type: 'textarea', rows: 2 },
           { key: 'data.ideals', label: 'Ideais', type: 'text' },
           { key: 'data.bonds', label: 'Vinculos', type: 'text' },
           { key: 'data.flaws', label: 'Fraquezas', type: 'text' },
+        ],
+      },
+      {
+        key: 'sheet', label: 'Ficha 5e',
+        defaultCollapsed: false,
+        fields: [
+          ...DND_ABILITIES,
+          { key: 'data.armor_class', label: 'Classe de Armadura', type: 'number', placeholder: '10' },
+          { key: 'data.hit_points', label: 'Pontos de Vida', type: 'text', placeholder: 'Ex: 12/12' },
+          { key: 'data.speed', label: 'Deslocamento', type: 'text', placeholder: '9 m / 30 ft.' },
+          { key: 'data.proficiency_bonus', label: 'Bonus de proficiencia', type: 'text', placeholder: '+2' },
+          { key: 'data.saving_throws', label: 'Salvaguardas', type: 'text', placeholder: 'FOR +4, CON +4' },
+          { key: 'data.skills', label: 'Pericias', type: 'textarea', rows: 2 },
+          { key: 'data.proficiencies', label: 'Proficiencias', type: 'textarea', rows: 2 },
+          { key: 'data.equipment', label: 'Equipamento', type: 'textarea', rows: 3 },
+          { key: 'data.features', label: 'Caracteristicas de classe/raca', type: 'textarea', rows: 4 },
+          { key: 'data.spellcasting', label: 'Conjuracao', type: 'textarea', rows: 3 },
         ],
       },
       {
@@ -191,6 +223,10 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
         fields: [
           { key: 'description', label: 'Descricao', type: 'textarea', rows: 3 },
           { key: 'properties', label: 'Propriedades', type: 'textarea', rows: 3 },
+          { key: 'data.weight', label: 'Peso', type: 'number', placeholder: 'lb.' },
+          { key: 'data.valueText', label: 'Valor', type: 'text', placeholder: '25 po' },
+          { key: 'data.damage', label: 'Dano', type: 'text', placeholder: '1d8 cortante' },
+          { key: 'data.propertiesText', label: 'Propriedades 5e', type: 'text', placeholder: 'versatil, leve, finesse...' },
           { key: 'data.appearance', label: 'Aparencia fisica', type: 'textarea', rows: 2, placeholder: 'Material, forma, inscricoes...' },
         ],
       },
@@ -247,13 +283,6 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
           { key: 'description', label: 'Descricao', type: 'textarea', rows: 3 },
           { key: 'data.behavior', label: 'Comportamento', type: 'textarea', rows: 2, placeholder: 'Solitaria, em matilha, territorial...' },
           { key: 'data.habitat', label: 'Habitat', type: 'text', placeholder: 'Onde vive, onde e encontrada' },
-          {
-            key: 'data.threat_level',
-            label: 'Nivel de ameaca percebido',
-            type: 'slider',
-            sliderMin: 1, sliderMax: 5,
-            sliderLabels: ['Inofensiva', 'Devastadora'],
-          },
         ],
       },
       {

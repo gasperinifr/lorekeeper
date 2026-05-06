@@ -20,10 +20,11 @@ interface Props {
   onUseOriginal: (blob: Blob) => void
   onCancel: () => void
   loading?: boolean
+  defaultMode?: CropMode
 }
 
-export function ImageCropEditor({ src, onCrop, onUseOriginal, onCancel, loading }: Props) {
-  const [cropMode, setCropMode] = useState<CropMode>('photo')
+export function ImageCropEditor({ src, onCrop, onUseOriginal, onCancel, loading, defaultMode = 'original' }: Props) {
+  const [cropMode, setCropMode] = useState<CropMode>(defaultMode)
   const [zoom, setZoom] = useState(1)
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)

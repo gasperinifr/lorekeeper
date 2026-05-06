@@ -20,7 +20,7 @@ interface StatCardProps {
 function StatCard({ label, count, icon: Icon, color, to }: StatCardProps) {
   return (
     <Link to={to}>
-      <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 transition-colors group">
+      <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 transition-colors group min-h-[6rem]">
         <div className="flex items-center justify-between mb-3">
           <Icon size={16} className={clsx(color, 'opacity-70 group-hover:opacity-100 transition-opacity')} />
           <span className="font-display text-2xl text-parchment">{count}</span>
@@ -32,13 +32,13 @@ function StatCard({ label, count, icon: Icon, color, to }: StatCardProps) {
 }
 
 const ENTITY_STATS: { type: EntityType; label: string; icon: React.ElementType; color: string }[] = [
-  { type: 'characters', label: 'Personagens', icon: Users,   color: 'text-sky-400' },
-  { type: 'npcs',       label: 'NPCs',        icon: Skull,   color: 'text-violet-400' },
-  { type: 'locations',  label: 'Locais',      icon: Map,     color: 'text-emerald-400' },
-  { type: 'items',      label: 'Itens',       icon: Package, color: 'text-amber-400' },
-  { type: 'spells',     label: 'Magias',      icon: BookOpen,color: 'text-cyan-300' },
-  { type: 'creatures',  label: 'Criaturas',   icon: Sword,   color: 'text-rose-400' },
-  { type: 'notes',      label: 'Notas',       icon: Scroll,  color: 'text-parchment/50' },
+  { type: 'characters', label: 'Personagens', icon: Users, color: 'text-sky-400' },
+  { type: 'npcs', label: 'NPCs', icon: Skull, color: 'text-violet-400' },
+  { type: 'locations', label: 'Locais', icon: Map, color: 'text-emerald-400' },
+  { type: 'items', label: 'Itens', icon: Package, color: 'text-amber-400' },
+  { type: 'spells', label: 'Magias', icon: BookOpen, color: 'text-cyan-300' },
+  { type: 'creatures', label: 'Criaturas', icon: Sword, color: 'text-rose-400' },
+  { type: 'notes', label: 'Notas', icon: Scroll, color: 'text-parchment/50' },
 ]
 
 function EntityStatCard({ type, label, icon, color, campaignId }: typeof ENTITY_STATS[0] & { campaignId: string }) {
@@ -54,6 +54,8 @@ function EntityStatCard({ type, label, icon, color, campaignId }: typeof ENTITY_
   )
 }
 
+const STATUS_LABEL = { active: 'Ativa', paused: 'Pausada', completed: 'Concluida' }
+
 export function CampaignOverview() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const { data: campaign, isLoading } = useCampaign(campaignId!)
@@ -64,45 +66,50 @@ export function CampaignOverview() {
 
   const activeArc = arcs?.find(a => a.status === 'active')
   const totalSessions = arcs?.reduce((acc, a) => acc + (Number(a.session_count) || 0), 0) ?? 0
+  const bannerUrl = campaign.hub_banner_url || campaign.cover_image_url
+  const bannerFit = campaign.hub_banner_url ? campaign.hub_banner_fit ?? 'cover' : 'contain'
+  const bannerPosition = campaign.hub_banner_position ?? 'center'
 
   return (
-    <div className="p-8 w-full max-w-[1400px] mx-auto">
-      {/* Header da campanha */}
-      <div className="mb-10">
-        {campaign.cover_image_url && (
-          <div className="max-h-80 rounded-xl overflow-hidden mb-6 bg-stone-100 border border-stone-300 flex justify-center">
-            <img src={campaign.cover_image_url} alt={campaign.title} className="max-h-80 w-full object-cover" />
+    <div className="p-6 lg:p-8 w-full max-w-[1400px] mx-auto">
+      <div className="mb-6">
+        {bannerUrl && (
+          <div className="h-[clamp(14rem,32vh,24rem)] rounded-xl overflow-hidden mb-5 bg-stone-100 border border-stone-300 flex items-center justify-center">
+            <img
+              src={bannerUrl}
+              alt={campaign.title}
+              className={clsx('h-full w-full', bannerFit === 'cover' ? 'object-cover' : 'object-contain')}
+              style={{ objectPosition: bannerPosition }}
+            />
           </div>
         )}
+
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-parchment/30 mb-1 uppercase tracking-widest">
               {campaign.scenario_type ?? 'Campanha'}
             </p>
-            <h1 className="font-display text-3xl text-parchment">{campaign.title}</h1>
+            <h1 className="font-display text-3xl text-parchment leading-tight">{campaign.title}</h1>
             {campaign.description && (
-              <p className="text-parchment/50 text-sm mt-2 max-w-xl leading-relaxed">
+              <p className="text-parchment/50 text-sm mt-2 max-w-2xl leading-relaxed line-clamp-2">
                 {campaign.description}
               </p>
             )}
           </div>
-          <div className="shrink-0 text-right">
-            <span className={clsx(
-              'inline-block text-xs px-2.5 py-1 rounded-full border',
-              campaign.status === 'active'    && 'text-gold border-gold/30 bg-gold/10',
-              campaign.status === 'paused'    && 'text-parchment/40 border-stone-300',
-              campaign.status === 'completed' && 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
-            )}>
-              {{ active: 'Ativa', paused: 'Pausada', completed: 'Concluída' }[campaign.status]}
-            </span>
-          </div>
+          <span className={clsx(
+            'shrink-0 inline-block text-xs px-2.5 py-1 rounded-full border',
+            campaign.status === 'active' && 'text-gold border-gold/30 bg-gold/10',
+            campaign.status === 'paused' && 'text-parchment/40 border-stone-300',
+            campaign.status === 'completed' && 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
+          )}>
+            {STATUS_LABEL[campaign.status]}
+          </span>
         </div>
       </div>
 
-      {/* Arco ativo */}
       {activeArc && (
         <Link to={`/campaigns/${campaignId}/arcs/${activeArc.id}`}>
-          <div className="bg-gold/10 border border-gold/30 rounded-xl px-5 py-4 mb-8 hover:bg-gold/15 transition-colors">
+          <div className="bg-gold/10 border border-gold/30 rounded-xl px-5 py-4 mb-5 hover:bg-gold/15 transition-colors">
             <p className="text-xs text-gold/60 uppercase tracking-widest mb-1 flex items-center gap-1.5">
               <TrendingUp size={11} /> Arco em andamento
             </p>
@@ -114,10 +121,9 @@ export function CampaignOverview() {
         </Link>
       )}
 
-      {/* Stats de narrativa */}
-      <div className="grid grid-cols-2 gap-3 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-5">
         <Link to={`/campaigns/${campaignId}/arcs`}>
-          <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 transition-colors group">
+          <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 transition-colors group min-h-[6rem]">
             <div className="flex items-center justify-between mb-3">
               <GitBranch size={16} className="text-gold/60 group-hover:text-gold transition-colors" />
               <span className="font-display text-2xl text-parchment">{arcs?.length ?? 0}</span>
@@ -125,28 +131,26 @@ export function CampaignOverview() {
             <p className="text-xs text-parchment/40 group-hover:text-parchment/60 transition-colors">Arcos / Atos</p>
           </div>
         </Link>
-        <div className="bg-stone-100 border border-stone-300 rounded-xl p-4">
+        <div className="bg-stone-100 border border-stone-300 rounded-xl p-4 min-h-[6rem]">
           <div className="flex items-center justify-between mb-3">
             <Calendar size={16} className="text-parchment/30" />
             <span className="font-display text-2xl text-parchment">{totalSessions}</span>
           </div>
-          <p className="text-xs text-parchment/40">Sessões no total</p>
+          <p className="text-xs text-parchment/40">Sessoes no total</p>
         </div>
       </div>
 
-      {/* Stats de entidades */}
       <div>
         <p className="text-xs text-parchment/30 uppercase tracking-widest mb-3">Mundo</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {ENTITY_STATS.map(s => (
             <EntityStatCard key={s.type} {...s} campaignId={campaignId!} />
           ))}
         </div>
       </div>
 
-      {/* Membros */}
       {campaign.members && campaign.members.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-5">
           <p className="text-xs text-parchment/30 uppercase tracking-widest mb-3">Membros</p>
           <div className="flex flex-wrap gap-2">
             {campaign.members.map(m => (

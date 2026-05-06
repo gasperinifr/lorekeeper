@@ -69,6 +69,18 @@ export async function ensureSchema(db) {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_${table}_created_by ON ${table}(campaign_id, created_by)`)
   }
 
+  await db.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)')
+  await db.query("ALTER TABLE characters ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query("ALTER TABLE npcs ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query("ALTER TABLE locations ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query("ALTER TABLE items ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query("ALTER TABLE spells ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query("ALTER TABLE creatures ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
+  await db.query('ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS cover_image_url TEXT')
+  await db.query('ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS hub_banner_url TEXT')
+  await db.query("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS hub_banner_fit VARCHAR(20) DEFAULT 'cover'")
+  await db.query("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS hub_banner_position VARCHAR(50) DEFAULT 'center'")
+
   await db.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS image_url TEXT')
 
   await db.query(`
