@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import {
-  Users, Skull, Map, Package, Sword, Scroll,
+  Users, Skull, Map, Sword, Bug, Scroll,
   GitBranch, Calendar, TrendingUp, BookOpen,
 } from 'lucide-react'
 import { useCampaign } from '@/hooks/useCampaign'
@@ -35,9 +35,9 @@ const ENTITY_STATS: { type: EntityType; label: string; icon: React.ElementType; 
   { type: 'characters', label: 'Personagens', icon: Users, color: 'text-sky-400' },
   { type: 'npcs', label: 'NPCs', icon: Skull, color: 'text-violet-400' },
   { type: 'locations', label: 'Locais', icon: Map, color: 'text-emerald-400' },
-  { type: 'items', label: 'Itens', icon: Package, color: 'text-amber-400' },
+  { type: 'items', label: 'Itens', icon: Sword, color: 'text-amber-400' },
   { type: 'spells', label: 'Magias', icon: BookOpen, color: 'text-cyan-300' },
-  { type: 'creatures', label: 'Criaturas', icon: Sword, color: 'text-rose-400' },
+  { type: 'creatures', label: 'Criaturas', icon: Bug, color: 'text-rose-400' },
   { type: 'notes', label: 'Notas', icon: Scroll, color: 'text-parchment/50' },
 ]
 
