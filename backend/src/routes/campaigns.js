@@ -12,7 +12,7 @@ async function createUniqueInviteCode(db) {
     const { rows } = await db.query('SELECT id FROM campaign_invites WHERE code=$1', [code])
     if (!rows.length) return code
   }
-  throw new Error('Nao foi possivel gerar um codigo de convite.')
+  throw new Error('Não foi possível gerar um código de convite.')
 }
 
 function assertRole(role) {
@@ -44,7 +44,7 @@ export async function campaignRoutes(fastify) {
 
   fastify.post('/', { preHandler: authenticate }, async (req, reply) => {
     const { title, description, scenario_type, visibility, started_at, estimated_end_at } = req.body
-    if (!title) return reply.status(400).send({ error: 'title e obrigatorio.' })
+    if (!title) return reply.status(400).send({ error: 'title é obrigatório.' })
     const { rows } = await db.query(
       `INSERT INTO campaigns (owner_id,title,description,scenario_type,visibility,started_at,estimated_end_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
@@ -59,7 +59,7 @@ export async function campaignRoutes(fastify) {
 
   fastify.post('/join', { preHandler: authenticate }, async (req, reply) => {
     const code = String(req.body.code ?? '').trim().toUpperCase()
-    if (!code) return reply.status(400).send({ error: 'Codigo obrigatorio.' })
+    if (!code) return reply.status(400).send({ error: 'Código obrigatório.' })
 
     const { rows: invites } = await db.query(
       `SELECT ci.*,c.title
@@ -68,7 +68,7 @@ export async function campaignRoutes(fastify) {
        WHERE ci.code=$1 AND ci.used_at IS NULL AND ci.expires_at > NOW()`,
       [code]
     )
-    if (!invites.length) return reply.status(404).send({ error: 'Convite invalido ou expirado.' })
+    if (!invites.length) return reply.status(404).send({ error: 'Convite inválido ou expirado.' })
 
     const invite = invites[0]
     const { rows: users } = await db.query('SELECT email FROM users WHERE id=$1', [req.user.id])
@@ -102,7 +102,7 @@ export async function campaignRoutes(fastify) {
        WHERE c.id=$1`,
       [req.params.campaignId, req.user.id]
     )
-    if (!rows.length) return reply.status(404).send({ error: 'Campanha nao encontrada.' })
+    if (!rows.length) return reply.status(404).send({ error: 'Campanha não encontrada.' })
     return reply.send(rows[0])
   })
 
@@ -133,7 +133,7 @@ export async function campaignRoutes(fastify) {
       return reply.status(403).send({ error: 'Apenas admins podem atribuir Admin ou Mestre.' })
     }
     const { rows: u } = await db.query('SELECT id FROM users WHERE email=$1', [email])
-    if (!u.length) return reply.status(404).send({ error: 'Usuario nao encontrado.' })
+    if (!u.length) return reply.status(404).send({ error: 'Usuário não encontrado.' })
     const { rows } = await db.query(
       `INSERT INTO campaign_members (campaign_id,user_id,role,play_role) VALUES ($1,$2,$3,$4)
        ON CONFLICT (campaign_id,user_id) DO UPDATE SET role=$3,play_role=$4 RETURNING *`,
@@ -159,7 +159,7 @@ export async function campaignRoutes(fastify) {
        RETURNING id,campaign_id,user_id,role,play_role`,
       vals
     )
-    if (!rows.length) return reply.status(404).send({ error: 'Membro nao encontrado.' })
+    if (!rows.length) return reply.status(404).send({ error: 'Membro não encontrado.' })
     return reply.send(rows[0])
   })
 

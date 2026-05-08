@@ -33,9 +33,9 @@ export async function chatRoutes(fastify) {
 
   fastify.delete('/campaigns/:campaignId/chat/messages/:messageId', { preHandler: requireCampaignAccess }, async (req, reply) => {
     const { rows } = await db.query('SELECT user_id FROM chat_messages WHERE id=$1 AND campaign_id=$2', [req.params.messageId, req.params.campaignId])
-    if (!rows.length) return reply.status(404).send({ error: 'Mensagem nao encontrada.' })
+    if (!rows.length) return reply.status(404).send({ error: 'Mensagem não encontrada.' })
     if (rows[0].user_id !== req.user.id && !['admin', 'editor'].includes(req.campaignRole)) {
-      return reply.status(403).send({ error: 'Voce nao pode apagar esta mensagem.' })
+      return reply.status(403).send({ error: 'Você não pode apagar esta mensagem.' })
     }
     await db.query('DELETE FROM chat_messages WHERE id=$1 AND campaign_id=$2', [req.params.messageId, req.params.campaignId])
     return reply.status(204).send()

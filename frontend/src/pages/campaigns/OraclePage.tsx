@@ -14,8 +14,8 @@ const SUGGESTIONS = [
   'Quem sao os aliados mais importantes da campanha?',
   'O que aconteceu nas ultimas 3 sessoes?',
   'Crie 3 plot hooks envolvendo um local e uma faccao.',
-  'Quais NPCs ainda nao foram apresentados?',
-  'Que segredos os jogadores ainda nao descobriram?',
+  'Quais NPCs ainda não foram apresentados?',
+  'Que segredos os jogadores ainda não descobriram?',
 ]
 
 type CitationTarget = {

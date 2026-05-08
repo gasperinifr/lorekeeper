@@ -81,7 +81,7 @@ const TYPE_META: Partial<Record<GraphType, {
     }]
   })),
   arcs: { label: 'Arco', labelPlural: 'Arcos', icon: GitBranch, accentClass: 'text-gold', color: '#c9a227' },
-  sessions: { label: 'Sessao', labelPlural: 'Sessoes', icon: Calendar, accentClass: 'text-sky-300', color: '#7dd3fc' },
+  sessions: { label: 'Sessão', labelPlural: 'Sessões', icon: Calendar, accentClass: 'text-sky-300', color: '#7dd3fc' },
   events: { label: 'Evento', labelPlural: 'Eventos', icon: BookMarked, accentClass: 'text-crimson-light', color: '#f87171' },
 }
 
@@ -226,7 +226,7 @@ export function RelationshipGraphPage() {
             id: `event-session:${event.id}`,
             source: nodeKey('events', event.id),
             target: nodeKey('sessions', event.session_id),
-            label: 'sessao',
+            label: 'sessão',
           })
         }
         return eventEdges
@@ -435,7 +435,7 @@ export function RelationshipGraphPage() {
           <div className="h-full min-h-[360px] flex items-center justify-center text-sm text-parchment/30">Carregando grafo...</div>
         ) : nodes.length === 0 ? (
           <div className="h-full min-h-[360px] flex items-center justify-center text-sm text-parchment/30">
-            Nenhuma conexao encontrada com os filtros atuais.
+            Nenhuma conexão encontrada com os filtros atuais.
           </div>
         ) : (
           <svg ref={svgRef} viewBox={`0 0 ${size.width} ${size.height}`} className="block h-full w-full bg-stone-200">

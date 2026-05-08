@@ -12,7 +12,7 @@ const AUDIENCE_FIELDS = ['visibility', 'shared_with_user_id']
 const ENTITY_CONFIG = {
   characters: {
     table: 'characters', required: ['name'],
-    fields: ['name','race','class','level','description','backstory','portrait_url','is_active','visibility','shared_with_user_id','data','user_id'],
+    fields: ['name','race','class','level','description','backstory','portrait_url','is_alive','is_active','visibility','shared_with_user_id','data','user_id'],
     listOrder: 'name ASC',
   },
   npcs: {
@@ -65,15 +65,15 @@ async function normalizeAudience(db, req, body, existing = {}) {
 
   if (visibility === 'user') {
     if (!canViewDm(req)) {
-      return { error: 'Apenas admins ou mestre podem compartilhar com um usuario unico.' }
+      return { error: 'Apenas administradores ou mestre podem compartilhar com um usuário único.' }
     }
     const targetId = next.shared_with_user_id ?? existing.shared_with_user_id
-    if (!targetId) return { error: 'Escolha o usuario que podera ver esta criacao.' }
+    if (!targetId) return { error: 'Escolha o usuário que poderá ver esta criação.' }
     const { rows } = await db.query(
       'SELECT 1 FROM campaign_members WHERE campaign_id=$1 AND user_id=$2',
       [req.params.campaignId, targetId]
     )
-    if (!rows.length) return { error: 'Usuario alvo nao pertence a esta campanha.' }
+    if (!rows.length) return { error: 'Usuário alvo não pertence a esta campanha.' }
     next.shared_with_user_id = targetId
   } else if (AUDIENCE_FIELDS.some(field => next[field] !== undefined)) {
     next.shared_with_user_id = null
@@ -99,7 +99,7 @@ function buildUpdate(cfg, body) {
 async function validateLocationParent(db, campaignId, locationId, parentId, reply) {
   if (!parentId) return true
   if (locationId && parentId === locationId) {
-    reply.status(400).send({ error: 'Um local nao pode ser pai de si mesmo.' })
+    reply.status(400).send({ error: 'Um local não pode ser pai de si mesmo.' })
     return false
   }
 
@@ -108,7 +108,7 @@ async function validateLocationParent(db, campaignId, locationId, parentId, repl
     [parentId, campaignId]
   )
   if (!parent.length) {
-    reply.status(400).send({ error: 'Local pai invalido para esta campanha.' })
+    reply.status(400).send({ error: 'Local pai inválido para esta campanha.' })
     return false
   }
 
@@ -122,7 +122,7 @@ async function validateLocationParent(db, campaignId, locationId, parentId, repl
       [locationId, campaignId, parentId]
     )
     if (descendants.length) {
-      reply.status(400).send({ error: 'Um local nao pode ser movido para dentro de um sub-local dele.' })
+      reply.status(400).send({ error: 'Um local não pode ser movido para dentro de um sub-local dele.' })
       return false
     }
   }
@@ -151,7 +151,7 @@ export async function entityRoutes(fastify) {
 
     fastify.post(base, { preHandler: requireEditor }, async (req, reply) => {
       for (const f of cfg.required) {
-        if (!req.body[f]) return reply.status(400).send({ error: `Campo obrigatorio: ${f}` })
+        if (!req.body[f]) return reply.status(400).send({ error: `Campo obrigatório: ${f}` })
       }
       if (cfg.table === 'locations') {
         const ok = await validateLocationParent(db, req.params.campaignId, null, req.body.parent_id, reply)
@@ -185,7 +185,7 @@ export async function entityRoutes(fastify) {
           [req.params.campaignId, entityType, req.params.id]
         ),
       ])
-      if (!e.rows.length) return reply.status(404).send({ error: 'Entidade nao encontrada.' })
+      if (!e.rows.length) return reply.status(404).send({ error: 'Entidade não encontrada.' })
       const links = await filterVisibleLinks(db, req, entityType, req.params.id, l.rows)
       return reply.send({ ...sanitizeEntityRow(e.rows[0], req, cfg.table), links, event_links: ev.rows, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole, _can_view_dm: canViewDm(req) })
     })
@@ -196,7 +196,7 @@ export async function entityRoutes(fastify) {
         `SELECT * FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`,
         [req.params.id, req.params.campaignId, ...access.vals]
       )
-      if (!existing.length) return reply.status(404).send({ error: 'Entidade nao encontrada.' })
+      if (!existing.length) return reply.status(404).send({ error: 'Entidade não encontrada.' })
 
       if (cfg.table === 'locations' && req.body.parent_id) {
         const ok = await validateLocationParent(db, req.params.campaignId, req.params.id, req.body.parent_id, reply)
@@ -221,7 +221,7 @@ export async function entityRoutes(fastify) {
         `DELETE FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`,
         vals
       )
-      if (!rowCount) return reply.status(404).send({ error: 'Entidade nao encontrada.' })
+      if (!rowCount) return reply.status(404).send({ error: 'Entidade não encontrada.' })
       return reply.status(204).send()
     })
   }

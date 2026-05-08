@@ -5,7 +5,7 @@ let supabase
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-    throw new Error('Storage nao configurado: defina SUPABASE_URL e SUPABASE_SERVICE_KEY.')
+    throw new Error('Storage não configurado: defina SUPABASE_URL e SUPABASE_SERVICE_KEY.')
   }
 
   if (!supabase) {

@@ -21,33 +21,33 @@ export async function aiRoutes(fastify) {
     ])
     const c = camp.rows[0]
     return `Campanha: "${c.title}" (${c.scenario_type ?? 'fantasia'})
-Descricao: ${c.description ?? 'nao definida'}
+Descrição: ${c.description ?? 'não definida'}
 Personagens: ${chars.rows.map(r => `${r.name} (${r.race} ${r.class})`).join(', ') || 'nenhum'}
 NPCs: ${npcs.rows.map(r => `${r.name} (${r.role})`).join(', ') || 'nenhum'}
 Locais: ${locs.rows.map(r => `${r.name} (${r.type})`).join(', ') || 'nenhum'}`
   }
 
-  const SYSTEM = `Voce e um assistente especialista em D&D 5e e narrativa de RPG de mesa.
+  const SYSTEM = `Você é um assistente especialista em D&D 5e e narrativa de RPG de mesa.
 REGRAS OBRIGATORIAS:
 - Responda SEMPRE em portugues brasileiro natural, com acentos, cedilha e concordancia correta
 - Quando pedido JSON, retorne APENAS o JSON, sem texto antes, sem blocos de codigo
 - O JSON deve ser valido e parseable com JSON.parse()
 - Seja criativo e coerente com o mundo da campanha
 - Para conteudo de criaturas, itens e magias, siga as convencoes oficiais de D&D 5e (SRD): nomenclaturas, escalas e coerencia mecanica
-- Nao invente mecanicas absurdas ou contraditorias (ex.: CR 1 com dano de boss lendario)
-- Nunca use frases vagas como "sofre efeitos adicionais", "efeitos especiais" ou "algo acontece" sem descrever exatamente dano, condicao, duracao, teste de resistencia e efeito
-- Se faltar dado exato, prefira completar com um valor plausivel e claramente padrao de 5e`
+- Não invente mecânicas absurdas ou contraditórias (ex.: CR 1 com dano de boss lendário)
+- Nunca use frases vagas como "sofre efeitos adicionais", "efeitos especiais" ou "algo acontece" sem descrever exatamente dano, condição, duração, teste de resistência e efeito
+- Se faltar dado exato, prefira completar com um valor plausível e claramente padrão de 5e`
 
   function aiErrorMessage(err) {
     const message = err?.message ?? 'Erro desconhecido.'
-    if (/Groq nao configurado/i.test(message)) {
-      return 'IA nao configurada no backend. Defina GROQ_API_KEY no Fly.'
+    if (/Groq não configurado|Groq nao configurado/i.test(message)) {
+      return 'IA não configurada no backend. Defina GROQ_API_KEY no Fly.'
     }
     if (/api key|unauthorized|authentication/i.test(message)) {
       return 'Falha ao autenticar na Groq. Verifique GROQ_API_KEY no Fly.'
     }
     if (/model/i.test(message)) {
-      return `Falha ao gerar com IA: modelo da Groq invalido ou indisponivel (${message}).`
+      return `Falha ao gerar com IA: modelo da Groq inválido ou indisponível (${message}).`
     }
     return `Falha ao gerar com IA: ${message}`
   }
@@ -59,7 +59,7 @@ REGRAS OBRIGATORIAS:
       const text = await complete(SYSTEM, `${ctx}\n\nCrie um NPC.${hint ? ` Direcao: "${hint}".` : ''}
 Retorne JSON:
 {"name":"...","race":"...","role":"...","description":"...","personality":"...","secrets":"...","hook":"...","data":{"age":"...","appearance":"...","voice":"...","motivation":"...","fear":"...","mannerism":"...","plot_hook":"...","dm_notes":"..."}}
-Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases por campo.`, 950)
+Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases por campo.`, 950)
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar NPC com IA')
@@ -79,13 +79,13 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
         )
         if (rows.length) {
           const parent = rows[0]
-          parentContext = `\nLocal pai/mae: "${parent.name}" (${parent.type ?? 'sem tipo'}). Descricao: ${parent.description ?? 'sem descricao'}. O novo local deve funcionar como sub-local coerente desse lugar.`
+          parentContext = `\nLocal pai/mãe: "${parent.name}" (${parent.type ?? 'sem tipo'}). Descrição: ${parent.description ?? 'sem descrição'}. O novo local deve funcionar como sub-local coerente desse lugar.`
         }
       }
-      const text = await complete(SYSTEM, `${ctx}${parentContext}\n\nCrie um local para a campanha.${hint ? ` Direcao: "${hint}".` : ''}
+      const text = await complete(SYSTEM, `${ctx}${parentContext}\n\nCrie um local para a campanha.${hint ? ` Direção: "${hint}".` : ''}
 Retorne JSON:
-{"name":"...","type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruina|Planicie|Porto|Outro","description":"...","hook":"...","secret":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
-Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases por campo.`, 1050)
+{"name":"...","type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruína|Planície|Porto|Outro","description":"...","hook":"...","secret":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
+Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases por campo.`, 1050)
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar local com IA')
@@ -101,12 +101,12 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
        WHERE s.id=$1 AND s.campaign_id=$2 GROUP BY s.id`,
       [sessionId, req.params.campaignId]
     )
-    if (!rows.length) return reply.status(404).send({ error: 'Sessao nao encontrada.' })
+    if (!rows.length) return reply.status(404).send({ error: 'Sessão não encontrada.' })
     const ctx = await getCampaignContext(req.params.campaignId)
     const s = rows[0]
     const notes = canViewDm(req) ? s.dm_notes : ''
     const text = await complete(SYSTEM,
-      `${ctx}\n\nSessao: "${s.title}"\nNotas: ${notes ?? '(sem notas)'}\nEncontros: ${s.encounters?.map(e => e.title).filter(Boolean).join(', ') || 'nenhum'}\n\nEscreva um resumo narrativo em 3-5 paragrafos, terceira pessoa. Retorne apenas o texto.`,
+      `${ctx}\n\nSessão: "${s.title}"\nNotas: ${notes ?? '(sem notas)'}\nEncontros: ${s.encounters?.map(e => e.title).filter(Boolean).join(', ') || 'nenhum'}\n\nEscreva um resumo narrativo em 3-5 parágrafos, terceira pessoa. Retorne apenas o texto.`,
       1000
     )
     return reply.send({ summary: text })
@@ -131,7 +131,7 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
     const { title, content } = req.body
     const ctx = await getCampaignContext(req.params.campaignId)
     const text = await complete(SYSTEM,
-      `${ctx}\n\nNota:\nTitulo: "${title}"\nConteudo: "${content}"\n\nExpanda em lore rico, max 400 palavras. Retorne apenas o texto.`,
+      `${ctx}\n\nNota:\nTítulo: "${title}"\nConteúdo: "${content}"\n\nExpanda em lore rico, máx. 400 palavras. Retorne apenas o texto.`,
       700
     )
     return reply.send({ expanded: text })
@@ -140,28 +140,28 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
   fastify.post('/campaigns/:campaignId/ai/entity-draft', { preHandler: requireEditor }, async (req, reply) => {
     try {
       const { entity_type, name, hint } = req.body
-      if (!entity_type || !name) return reply.status(400).send({ error: 'entity_type e name sao obrigatorios.' })
+      if (!entity_type || !name) return reply.status(400).send({ error: 'entity_type e name são obrigatórios.' })
 
       const ctx = await getCampaignContext(req.params.campaignId)
-      const direction = hint ? ` Direcao: "${hint}".` : ''
+      const direction = hint ? ` Direção: "${hint}".` : ''
       const DND_5E_RULES = `
-REGRAS TECNICAS 5e:
-- Criaturas: use CR plausivel para ameaca, valores coerentes de CA/PV/deslocamento e atributos STR/DEX/CON/INT/WIS/CHA de 1 a 30.
-- Criaturas: a ficha deve ter tracos e acoes jogaveis. Cada acao de ataque precisa dizer tipo de ataque, bonus para acertar, alcance, alvo e dano.
+REGRAS TÉCNICAS 5e:
+- Criaturas: use CR plausível para ameaça, valores coerentes de CA/PV/deslocamento e atributos STR/DEX/CON/INT/WIS/CHA de 1 a 30.
+- Criaturas: a ficha deve ter traços e ações jogáveis. Cada ação de ataque precisa dizer tipo de ataque, bônus para acertar, alcance, alvo e dano.
 - Itens: respeite raridade e tipo. Evite poderes quebrados para raridades baixas.
-- Magias: respeite nivel (0-9), escola, componentes e duracao em formato comum de 5e.
-- Magias: o efeito deve especificar alvo/area, teste de resistencia ou ataque, dano com tipo, condicao aplicada se houver, duracao e o que acontece em sucesso/falha.
-- Estrutura: sempre incluir um campo "data" quando houver detalhes mecanicos.
-- Nao deixe campos vazios no JSON final. Se nao houver dado canonico, preencha com uma opcao plausivel e neutra.
+- Magias: respeite nível (0-9), escola, componentes e duração em formato comum de 5e.
+- Magias: o efeito deve especificar alvo/área, teste de resistência ou ataque, dano com tipo, condição aplicada se houver, duração e o que acontece em sucesso/falha.
+- Estrutura: sempre incluir um campo "data" quando houver detalhes mecânicos.
+- Não deixe campos vazios no JSON final. Se não houver dado canônico, preencha com uma opção plausível e neutra.
 - Priorize termos de regra do SRD 5e.
-- Escreva todos os textos mecanicos em portugues brasileiro com acentos. Evite portugues literal/truncado.
+- Escreva todos os textos mecânicos em português brasileiro com acentos. Evite português literal/truncado.
 `
       const PROMPTS = {
         npcs: `Crie um rascunho para o NPC chamado "${name}".${direction}
 Retorne JSON com estes campos (preencha todos):
 {"role":"...","race":"...","description":"...","personality":"...","data":{"age":"...","appearance":"...","voice":"...","motivation":"...","fear":"...","mannerism":"..."}}
 Tambem pode incluir em data: {"dm_notes":"...","plot_hook":"...","hook":"..."} quando fizer sentido.
-IMPORTANTE: seja conciso. Maximo 2 frases por campo. Nao invente fatos que contradigam o contexto.`,
+IMPORTANTE: seja conciso. Máximo 2 frases por campo. Não invente fatos que contradigam o contexto.`,
         locations: `Crie um rascunho para o local chamado "${name}".${direction}
 Retorne JSON:
 {"type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruina|Planicie|Porto|Outro","description":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
@@ -169,28 +169,28 @@ IMPORTANTE: preencha todos os campos e seja conciso. Maximo 2 frases por campo.`
         creatures: `Crie um rascunho para a criatura chamada "${name}".${direction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
-{"type":"Monstruosidade","cr":"5","description":"Predador de ruinas antigas.","data":{"statBlock":true,"ac":"15 (armadura natural)","hpText":"95 (10d10+40)","speedText":"9 m, escalada 6 m","str":18,"dex":14,"con":18,"int":8,"wis":12,"cha":10,"senses":"visao no escuro 18 m, Percepcao passiva 11","languages":"compreende Comum, mas nao fala","resist":"frio","immune":"","vulnerable":"","conditionImmune":"","traits":[{"name":"Faro Aguçado","text":"Vantagem em testes de Sabedoria (Percepcao) que dependam de olfato."}],"actions":[{"name":"Multiataque","text":"A criatura realiza dois ataques de garra."}],"bonus":[],"reactions":[],"legendary":[]}}
+{"type":"Monstruosidade","cr":"5","description":"Predador de ruínas antigas.","data":{"statBlock":true,"ac":"15 (armadura natural)","hpText":"95 (10d10+40)","speedText":"9 m, escalada 6 m","str":18,"dex":14,"con":18,"int":8,"wis":12,"cha":10,"senses":"visão no escuro 18 m, Percepção passiva 11","languages":"compreende Comum, mas não fala","resist":"frio","immune":"","vulnerable":"","conditionImmune":"","traits":[{"name":"Faro Aguçado","text":"Vantagem em testes de Sabedoria (Percepção) que dependam de olfato."}],"actions":[{"name":"Multiataque","text":"A criatura realiza dois ataques de garra."}],"bonus":[],"reactions":[],"legendary":[]}}
 Retorne JSON:
 {"type":"Aberracao|Besta|Celestial|Construto|Dragao|Elemental|Fada|Fiend|Gigante|Humanoide|Morto-Vivo|Monstruosidade|Planta|Slime|Outro","cr":"...","description":"...","data":{"behavior":"...","habitat":"...","tactics":"...","weaknesses":"...","loot":"...","dm_notes":"...","statBlock":true,"ac":"...","hpText":"...","speedText":"...","str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10,"senses":"...","languages":"...","resist":"...","immune":"...","vulnerable":"...","conditionImmune":"...","traits":[{"name":"...","text":"..."}],"actions":[{"name":"...","text":"..."}],"bonus":[{"name":"...","text":"..."}],"reactions":[{"name":"...","text":"..."}],"legendary":[{"name":"...","text":"..."}]}}
-IMPORTANTE: preencha todos os campos; use listas vazias [] quando nao houver entradas. Maximo 2 frases por campo. Toda acao deve ser resolvivel na mesa sem interpretacao extra.`,
+IMPORTANTE: preencha todos os campos; use listas vazias [] quando não houver entradas. Máximo 2 frases por campo. Toda ação deve ser resolvível na mesa sem interpretação extra.`,
         items: `Crie um rascunho para o item chamado "${name}".${direction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"type":"Arma","rarity":"Raro","description":"Lamina curta com runas de trovão.","properties":"finesse, leve","data":{"itemBlock":true,"weight":1.5,"valueText":"2.000 po","damage":"1d6 perfurante + 1d4 trovao","propertiesText":"finesse, leve","entries":"Quando acerta um ataque, o alvo sofre +1d4 de dano de trovão.","requiresAttunement":false,"appearance":"Aco azulado com runas brilhantes.","history":"Forjada por um anão dos picos.","curse":"","dm_notes":""}}
 Retorne JSON:
 {"type":"Arma|Armadura|Artefato|Consumivel|Ferramenta|Tesouro|Outro","rarity":"Comum|Incomum|Raro|Muito Raro|Lendario|Artefato","description":"...","properties":"...","data":{"appearance":"...","history":"...","curse":"...","dm_notes":"...","itemBlock":true,"weight":0,"valueText":"...","damage":"...","propertiesText":"...","entries":"...","requiresAttunement":false}}
-IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo. Nao escreva efeito vago: todo dano, condicao, alvo, area, duracao e teste devem estar definidos.`,
+IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva efeito vago: todo dano, condição, alvo, área, duração e teste devem estar definidos.`,
         spells: `Crie um rascunho para a magia chamada "${name}".${direction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"level":3,"school":"Evocacao","casting_time":"1 acao","range":"18 m","components":"V,S,M (um fio de cobre)","duration":"Instantanea","description":"Um raio atinge um alvo visivel.","data":{"spellBlock":true,"castingTime":"1 acao","range":"18 m","componentsText":"V,S,M (um fio de cobre)","duration":"Instantanea","damageInflict":"trovao","savingThrow":"Constituicao","entries":"O alvo faz um teste de resistencia de Constituicao.","higherLevel":[{"name":"Em niveis superiores","text":"O dano aumenta em 1d8 por nivel acima do 3º."}]}}
 Retorne JSON:
 {"level":0,"school":"Abjuracao|Conjuracao|Adivinhacao|Encantamento|Evocacao|Ilusao|Necromancia|Transmutacao","casting_time":"...","range":"...","components":"...","duration":"...","description":"...","data":{"spellBlock":true,"castingTime":"...","range":"...","componentsText":"...","duration":"...","damageInflict":"...","savingThrow":"...","entries":"...","higherLevel":[{"name":"Em niveis superiores","text":"..."}]}}
-IMPORTANTE: preencha todos os campos. Maximo 2 frases por campo. Nao escreva efeito vago: todo dano, condicao, alvo, area, duracao e teste devem estar definidos.`,
+IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva efeito vago: todo dano, condição, alvo, área, duração e teste devem estar definidos.`,
       }
 
       const prompt = PROMPTS[entity_type]
-      if (!prompt) return reply.status(400).send({ error: `Tipo nao suportado: ${entity_type}` })
+      if (!prompt) return reply.status(400).send({ error: `Tipo não suportado: ${entity_type}` })
 
       const text = await complete(SYSTEM, `${ctx}\n\n${prompt}`, 900)
       return reply.send(parseJSON(text))
@@ -228,10 +228,10 @@ Descricao: ${description ?? '(sem descricao)'}
 Entidades existentes na campanha:
 ${entityList}
 
-Identifique ate 3 conexoes que fazem sentido narrativo entre a nova entidade e as existentes.
+Identifique até 3 conexões que fazem sentido narrativo entre a nova entidade e as existentes.
 Retorne JSON:
 {"suggestions":[{"target_id":"uuid","target_type":"tipo","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|odio|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
-So inclua sugestoes com confidence >= 0.6. Se nao houver, retorne {"suggestions":[]}.`,
+Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
         600
       )
       const parsed = parseJSON(text)
@@ -257,12 +257,12 @@ So inclua sugestoes com confidence >= 0.6. Se nao houver, retorne {"suggestions"
   }
 
   function oracleSystemPrompt(context, mode) {
-    return `Voce e o Oracle do Lorekeeper: um assistente narrativo persistente que conhece a campanha abaixo.
+    return `Você é o Oracle do Lorekeeper: um assistente narrativo persistente que conhece a campanha abaixo.
 Responda SEMPRE em portugues brasileiro.
-Use o contexto da campanha como fonte principal. Se uma informacao nao estiver no contexto, diga isso claramente e ofereca uma inferencia util.
+Use o contexto da campanha como fonte principal. Se uma informação não estiver no contexto, diga isso claramente e ofereça uma inferência útil.
 Mantenha continuidade com o historico da conversa.
-Modo atual: ${mode === 'dm' ? 'DM. Voce pode mencionar segredos, notas privadas e bastidores.' : 'Jogador. Nao revele segredos, notas privadas, conteudo de DM ou informacoes marcadas como nao publicas.'}
-Sempre que citar uma entidade, evento, sessao, arco, local, nota, item, magia, criatura ou personagem listado em <citations>, escreva o nome exato com @ no inicio, por exemplo @Nome Citavel. Nao coloque @ em conceitos que nao estejam em <citations>.
+Modo atual: ${mode === 'dm' ? 'DM. Você pode mencionar segredos, notas privadas e bastidores.' : 'Jogador. Não revele segredos, notas privadas, conteúdo de DM ou informações marcadas como não públicas.'}
+Sempre que citar uma entidade, evento, sessão, arco, local, nota, item, magia, criatura ou personagem listado em <citations>, escreva o nome exato com @ no início, por exemplo @Nome Citável. Não coloque @ em conceitos que não estejam em <citations>.
 Seja direto, criativo e pratico para mesa de RPG.
 
 ${context}`

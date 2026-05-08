@@ -15,8 +15,8 @@ export function useUnsavedChangesPrompt({
   when,
   onSave,
   saving = false,
-  title = 'Alteracoes nao salvas',
-  message = 'Voce alterou informacoes que ainda nao foram salvas. O que deseja fazer?',
+  title = 'Alterações não salvas',
+  message = 'Você alterou informações que ainda não foram salvas. O que deseja fazer?',
 }: Options) {
   const bypassRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -72,7 +72,7 @@ export function useUnsavedChangesPrompt({
       if (result === false) return
       blocker.proceed?.()
     } catch (err: any) {
-      setError(err.message ?? 'Nao foi possivel salvar as alteracoes.')
+      setError(err.message ?? 'Não foi possível salvar as alterações.')
     } finally {
       setIsSaving(false)
     }
@@ -94,7 +94,7 @@ export function useUnsavedChangesPrompt({
               </Button>
               {onSave && (
                 <Button type="button" size="sm" onClick={saveAndLeave} loading={saving || isSaving}>
-                  Salvar alteracoes
+                  Salvar alterações
                 </Button>
               )}
             </div>

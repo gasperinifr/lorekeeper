@@ -57,7 +57,7 @@ export function EntityAIGenerator({ campaignId, entityType, onClose, onCreated }
       onCreated?.(created.id)
       onClose()
     } catch (err: any) {
-      setError(err?.message ?? 'Nao foi possivel criar com IA agora.')
+      setError(err?.message ?? 'Não foi possível criar com IA agora.')
     }
   }
 

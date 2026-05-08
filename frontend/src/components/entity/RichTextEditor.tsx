@@ -219,7 +219,7 @@ export function RichTextEditor({ campaignId, value, onChange }: Props) {
       const { url } = await res.json()
       insertHtml(`<p><img src="${url}" alt="" /></p>`)
     } catch (err: any) {
-      setError(err.message ?? 'Nao foi possivel enviar a imagem.')
+      setError(err.message ?? 'Não foi possível enviar a imagem.')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -274,10 +274,10 @@ export function RichTextEditor({ campaignId, value, onChange }: Props) {
           <Italic size={15} />
         </button>
         <span className="mx-1 h-5 w-px bg-stone-300" />
-        <button type="button" className={toolbarButton} onMouseDown={e => e.preventDefault()} onClick={() => command('formatBlock', 'H2')} title="Titulo H2">
+        <button type="button" className={toolbarButton} onMouseDown={e => e.preventDefault()} onClick={() => command('formatBlock', 'H2')} title="Título H2">
           <Heading2 size={16} />
         </button>
-        <button type="button" className={toolbarButton} onMouseDown={e => e.preventDefault()} onClick={() => command('formatBlock', 'H3')} title="Titulo H3">
+        <button type="button" className={toolbarButton} onMouseDown={e => e.preventDefault()} onClick={() => command('formatBlock', 'H3')} title="Título H3">
           <Heading3 size={16} />
         </button>
         <button type="button" className={toolbarButton} onMouseDown={e => e.preventDefault()} onClick={() => command('insertUnorderedList')} title="Lista">

@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS characters (
   description  TEXT,
   backstory    TEXT,
   portrait_url TEXT,
+  is_alive     BOOLEAN DEFAULT true,
   is_active    BOOLEAN DEFAULT true,
   visibility   VARCHAR(20) DEFAULT 'public',
   data         JSONB DEFAULT '{}',

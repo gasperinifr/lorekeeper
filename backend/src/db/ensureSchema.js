@@ -70,6 +70,7 @@ export async function ensureSchema(db) {
   }
 
   await db.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)')
+  await db.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS is_alive BOOLEAN DEFAULT true')
   await db.query("ALTER TABLE characters ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
   await db.query("ALTER TABLE npcs ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")
   await db.query("ALTER TABLE locations ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}'")

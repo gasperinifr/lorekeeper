@@ -20,11 +20,9 @@ interface StatCardProps {
 function StatCard({ label, count, icon: Icon, color, to }: StatCardProps) {
   return (
     <Link to={to}>
-      <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl px-4 py-3 transition-colors group min-h-[4.75rem]">
-        <div className="flex items-center justify-between mb-2">
-          <Icon size={16} className={clsx(color, 'opacity-70 group-hover:opacity-100 transition-opacity')} />
-          <span className="font-display text-2xl leading-none text-parchment">{count}</span>
-        </div>
+      <div className="relative bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl px-4 py-3 pr-12 transition-colors group min-h-[4.75rem]">
+        <Icon size={16} className={clsx(color, 'opacity-70 group-hover:opacity-100 transition-opacity mb-4')} />
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 font-display text-2xl leading-none text-parchment">{count}</span>
         <p className="text-xs text-parchment/40 group-hover:text-parchment/60 transition-colors">{label}</p>
       </div>
     </Link>
@@ -54,7 +52,7 @@ function EntityStatCard({ type, label, icon, color, campaignId }: typeof ENTITY_
   )
 }
 
-const STATUS_LABEL = { active: 'Ativa', paused: 'Pausada', completed: 'Concluida' }
+const STATUS_LABEL = { active: 'Ativa', paused: 'Pausada', completed: 'Concluída' }
 
 export function CampaignOverview() {
   const { campaignId } = useParams<{ campaignId: string }>()
@@ -123,20 +121,16 @@ export function CampaignOverview() {
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Link to={`/campaigns/${campaignId}/arcs`}>
-          <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 transition-colors group min-h-[6rem]">
-            <div className="flex items-center justify-between mb-3">
-              <GitBranch size={16} className="text-gold/60 group-hover:text-gold transition-colors" />
-              <span className="font-display text-2xl leading-none text-parchment">{arcs?.length ?? 0}</span>
-            </div>
+          <div className="relative bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-xl p-4 pr-12 transition-colors group min-h-[6rem]">
+            <GitBranch size={16} className="text-gold/60 group-hover:text-gold transition-colors mb-5" />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 font-display text-2xl leading-none text-parchment">{arcs?.length ?? 0}</span>
             <p className="text-xs text-parchment/40 group-hover:text-parchment/60 transition-colors">Arcos / Atos</p>
           </div>
         </Link>
-        <div className="bg-stone-100 border border-stone-300 rounded-xl p-4 min-h-[6rem]">
-          <div className="flex items-center justify-between mb-3">
-            <Calendar size={16} className="text-parchment/30" />
-            <span className="font-display text-2xl leading-none text-parchment">{totalSessions}</span>
-          </div>
-          <p className="text-xs text-parchment/40">Sessoes no total</p>
+        <div className="relative bg-stone-100 border border-stone-300 rounded-xl p-4 pr-12 min-h-[6rem]">
+          <Calendar size={16} className="text-parchment/30 mb-5" />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 font-display text-2xl leading-none text-parchment">{totalSessions}</span>
+          <p className="text-xs text-parchment/40">Sessões no total</p>
         </div>
       </div>
 

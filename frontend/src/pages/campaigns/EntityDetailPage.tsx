@@ -78,7 +78,7 @@ function hasValue(value: any) {
 
 function renderValue(value: any) {
   if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Nao'
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
   return String(value)
 }
 
@@ -164,9 +164,9 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-parchment font-medium flex items-center gap-2">
-                <Link2 size={14} className="text-gold" /> Sugestoes de conexao
+                <Link2 size={14} className="text-gold" /> Sugestões de conexão
               </p>
-              <p className="text-xs text-parchment/35 mt-1">Opcional, voce pode descartar tudo.</p>
+              <p className="text-xs text-parchment/35 mt-1">Opcional, você pode descartar tudo.</p>
             </div>
             <button
               type="button"

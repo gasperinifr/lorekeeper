@@ -12,7 +12,7 @@ export async function uploadRoutes(fastify) {
 
       const allowed = ['image/jpeg', 'image/png', 'image/webp']
       if (!allowed.includes(data.mimetype)) {
-        return reply.status(400).send({ error: 'Tipo nao suportado.' })
+        return reply.status(400).send({ error: 'Tipo não suportado.' })
       }
 
       const ext = data.mimetype.split('/')[1]
@@ -29,9 +29,9 @@ export async function uploadRoutes(fastify) {
         return reply.status(413).send({ error: 'Imagem muito grande. Envie um arquivo de ate 5MB.' })
       }
 
-      if (/Storage nao configurado/i.test(err.message)) {
+      if (/Storage não configurado/i.test(err.message)) {
         return reply.status(500).send({
-          error: 'Upload de imagens nao configurado no backend. Defina SUPABASE_URL e SUPABASE_SERVICE_KEY no Fly.',
+          error: 'Upload de imagens não configurado no backend. Defina SUPABASE_URL e SUPABASE_SERVICE_KEY no Fly.',
         })
       }
 
@@ -48,7 +48,7 @@ export async function uploadRoutes(fastify) {
   fastify.delete('/uploads/image', { preHandler: authenticate }, async (req, reply) => {
     try {
       const { key } = req.body
-      if (!key) return reply.status(400).send({ error: 'key e obrigatorio.' })
+      if (!key) return reply.status(400).send({ error: 'key é obrigatório.' })
 
       await deleteFile(key)
       return reply.status(204).send()

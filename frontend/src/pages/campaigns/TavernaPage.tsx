@@ -14,7 +14,7 @@ import { clsx } from 'clsx'
 
 const EXTRA_TYPES = [
   { type: 'arcs' as const, label: 'Arcos' },
-  { type: 'sessions' as const, label: 'Sessoes' },
+  { type: 'sessions' as const, label: 'Sessões' },
 ]
 
 function linkableLabel(type: LinkableType) {
@@ -157,7 +157,7 @@ export function TavernaPage() {
                   own ? 'bg-gold/15 border border-gold/20' : 'bg-stone-100 border border-stone-300'
                 )}>
                   <div className="flex items-center gap-2 mb-1">
-                    {!own && <span className="text-xs text-gold/75">{message.username ?? 'Usuario'}</span>}
+                    {!own && <span className="text-xs text-gold/75">{message.username ?? 'Usuário'}</span>}
                     <span className="text-[11px] text-parchment/25">{messageTimestamp(message.created_at)}</span>
                     {canDelete && (
                       <button

@@ -54,7 +54,7 @@ function SessionContextGrid({ campaignId, sessionId, links }: {
       return { label: cfg.label, icon: cfg.icon, accentClass: cfg.accentClass }
     }
     if (type === 'arcs') return { label: 'Arco', icon: GitBranch, accentClass: 'text-gold' }
-    return { label: 'Sessao', icon: Calendar, accentClass: 'text-sky-300' }
+    return { label: 'Sessão', icon: Calendar, accentClass: 'text-sky-300' }
   }
 
   const displayName = (type: LinkableType, item: any) => {

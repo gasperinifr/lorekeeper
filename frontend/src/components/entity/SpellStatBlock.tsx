@@ -22,7 +22,7 @@ export function SpellStatBlock({ spell }: { spell: any }) {
   const headerFacts = [
     ['Tempo', data.castingTime ?? spell.casting_time],
     ['Alcance', data.range ?? spell.range],
-    ['Duracao', data.duration ?? spell.duration],
+    ['Duração', data.duration ?? spell.duration],
     ['Teste', data.savingThrow],
   ].filter(([, value]) => value !== undefined && value !== null && value !== '')
 

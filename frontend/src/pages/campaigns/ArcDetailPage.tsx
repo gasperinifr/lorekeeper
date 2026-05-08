@@ -37,7 +37,7 @@ export function ArcDetailPage() {
   }
 
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
-  if (!arc) return <div className="p-8 text-crimson-light text-sm">Arco nao encontrado.</div>
+  if (!arc) return <div className="p-8 text-crimson-light text-sm">Arco não encontrado.</div>
   const canEdit = ['admin', 'editor'].includes((arc as any)._role)
   const arcEvents = (events ?? []).filter(event =>
     event.arc_id === arcId ||
@@ -70,20 +70,20 @@ export function ArcDetailPage() {
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-2">
-              <Calendar size={12} /> Sessoes ({(arc.sessions ?? []).length})
+              <Calendar size={12} /> Sessões ({(arc.sessions ?? []).length})
             </h2>
             {canEdit && (
               <Button size="sm" variant="ghost" onClick={() => setAddingSession(a => !a)}>
-                <Plus size={13} /> Adicionar sessao
+                <Plus size={13} /> Adicionar sessão
               </Button>
             )}
           </div>
 
           {addingSession && (
             <div className="bg-stone-100 border border-gold/30 rounded-xl p-4 mb-4 flex flex-col gap-3">
-              <Input label="Titulo *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Sessao 1..." />
+              <Input label="Título *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Sessão 1..." />
               <div className="flex gap-3">
-                <Input label="Numero da sessao" type="number" value={form.session_number} onChange={e => setForm(f => ({ ...f, session_number: e.target.value }))} />
+                <Input label="Número da sessão" type="number" value={form.session_number} onChange={e => setForm(f => ({ ...f, session_number: e.target.value }))} />
                 <Input label="Data jogada" type="date" value={form.played_at} onChange={e => setForm(f => ({ ...f, played_at: e.target.value }))} />
               </div>
               <div className="flex flex-col gap-1">
@@ -93,19 +93,19 @@ export function ArcDetailPage() {
                   onChange={e => setForm(f => ({ ...f, visibility: e.target.value as 'public' | 'private' }))}
                   className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60"
                 >
-                  <option value="public">Publica</option>
+                  <option value="public">Pública</option>
                   <option value="private">Privada</option>
                 </select>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={submit} loading={createSession.isPending} className="flex-1">Criar sessao</Button>
+                <Button size="sm" onClick={submit} loading={createSession.isPending} className="flex-1">Criar sessão</Button>
                 <Button size="sm" variant="ghost" onClick={() => setAddingSession(false)}>Cancelar</Button>
               </div>
             </div>
           )}
 
           {(arc.sessions ?? []).length === 0 && !addingSession && (
-            <p className="text-parchment/25 text-sm italic text-center py-8">Nenhuma sessao neste arco ainda.</p>
+            <p className="text-parchment/25 text-sm italic text-center py-8">Nenhuma sessão neste arco ainda.</p>
           )}
 
           <div className="flex flex-col gap-2">
@@ -141,7 +141,7 @@ export function ArcDetailPage() {
                         'capitalize',
                         session.status === 'completed' ? 'text-emerald-400/60' : 'text-parchment/30'
                       )}>
-                        {session.status === 'completed' ? 'Concluida' : 'Planejada'}
+                        {session.status === 'completed' ? 'Concluída' : 'Planejada'}
                       </span>
                     </div>
                   </div>

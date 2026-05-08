@@ -29,7 +29,7 @@ const visibilityLabels: Record<string, string> = {
   public: 'Todos os membros',
   private: 'Apenas editores/admins',
   gm: 'Mestre e admins',
-  user: 'Usuario unico',
+  user: 'Usuário único',
 }
 
 const serializeForm = (value: unknown) => JSON.stringify(value ?? null)
@@ -287,7 +287,7 @@ function PendingConnectionsEditor({ campaignId, value, onChange }: {
   const types: { type: LinkableType; label: string; icon: React.ElementType }[] = [
     ...Object.entries(ENTITY_CONFIG).map(([type, cfg]) => ({ type: type as LinkableType, label: cfg.labelPlural, icon: cfg.icon })),
     { type: 'arcs', label: 'Arcos', icon: GitBranch },
-    { type: 'sessions', label: 'Sessoes', icon: Calendar },
+    { type: 'sessions', label: 'Sessões', icon: Calendar },
   ]
 
   const displayName = (type: LinkableType, item: any) => {
@@ -524,7 +524,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
       const result = await draft.generate({ entity_type: type, name, hint: draftHint.trim() || undefined })
       applyDraft(result)
     } catch {
-      setDraftError('Nao foi possivel gerar o rascunho agora.')
+      setDraftError('Não foi possível gerar o rascunho agora.')
     }
   }
 
@@ -598,7 +598,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <p className="text-sm text-parchment/70 font-medium">Rascunho assistido</p>
-                <p className="text-xs text-parchment/35 mt-1">A IA preenche apenas campos vazios; voce edita tudo antes de salvar.</p>
+                <p className="text-xs text-parchment/35 mt-1">A IA preenche apenas campos vazios; você edita tudo antes de salvar.</p>
               </div>
               <Button
                 type="button"
@@ -613,10 +613,10 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             </div>
             {showDraftHint ? (
               <Input
-                label="Direcao (opcional)"
+                label="Direção (opcional)"
                 value={draftHint}
                 onChange={event => setDraftHint(event.target.value)}
-                placeholder="Ex: tom sombrio, ligado a uma ruina antiga..."
+                placeholder="Ex: tom sombrio, ligado a uma ruína antiga..."
               />
             ) : (
               <button
@@ -624,7 +624,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
                 onClick={() => setShowDraftHint(true)}
                 className="self-start text-xs text-gold hover:text-gold-light transition-colors"
               >
-                Adicionar direcao
+                Adicionar direção
               </button>
             )}
             {draftError && <p className="text-xs text-crimson-light">{draftError}</p>}
@@ -690,7 +690,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
               </div>
               {field.key === 'visibility' && form.visibility === 'user' && (
                 <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 flex flex-col gap-1">
-                  <label className="text-sm text-parchment/70 font-medium">Usuario com acesso</label>
+                  <label className="text-sm text-parchment/70 font-medium">Usuário com acesso</label>
                   <select
                     value={form.shared_with_user_id ?? ''}
                     onChange={e => set('shared_with_user_id', e.target.value)}

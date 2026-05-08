@@ -23,7 +23,7 @@ const SEARCH_CONFIG = {
     accentClass: 'text-gold',
   },
   sessions: {
-    labelPlural: 'Sessoes',
+    labelPlural: 'Sessões',
     icon: Calendar,
     accentClass: 'text-sky-400',
   },

@@ -31,7 +31,7 @@ type LinkableOption = {
 
 const EXTRA_LINKABLES: LinkableOption[] = [
   { type: 'arcs', label: 'Arco', labelPlural: 'Arcos', icon: GitBranch, accentClass: 'text-gold' },
-  { type: 'sessions', label: 'Sessao', labelPlural: 'Sessoes', icon: Calendar, accentClass: 'text-sky-300' },
+  { type: 'sessions', label: 'Sessão', labelPlural: 'Sessões', icon: Calendar, accentClass: 'text-sky-300' },
   { type: 'events', label: 'Evento', labelPlural: 'Eventos', icon: BookMarked, accentClass: 'text-crimson-light' },
 ]
 
@@ -185,7 +185,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
   }
 
   const findItem = (type: LinkableType, id: string) => (lists[type] ?? []).find((item: any) => item.id === id)
-  const title = entityType === 'sessions' ? 'Contexto da sessao' : 'Conexoes'
+  const title = entityType === 'sessions' ? 'Contexto da sessão' : 'Conexões'
 
   return (
     <aside className="w-72 shrink-0 flex flex-col gap-6">
@@ -207,7 +207,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
             <button
               onClick={() => setAdding(a => !a)}
               className="text-parchment/30 hover:text-gold transition-colors"
-              title="Adicionar conexao"
+              title="Adicionar conexão"
             >
               <Plus size={14} />
             </button>
@@ -246,7 +246,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
               list="relation-suggestions"
               value={form.relation_label}
               onChange={e => setForm(f => ({ ...f, relation_label: e.target.value }))}
-              placeholder="Observacao da relacao..."
+              placeholder="Observação da relação..."
               className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 placeholder-parchment/30 focus:outline-none"
             />
             <datalist id="relation-suggestions">
@@ -275,8 +275,8 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
         {links.length === 0 && eventLinks.length === 0 && !adding && (
           <p className="text-xs text-parchment/25 italic">
             {entityType === 'sessions'
-              ? 'Conecte locais, NPCs, personagens, notas e acontecimentos para montar o contexto vivo desta sessao.'
-              : 'Nenhuma conexao ainda.'}
+              ? 'Conecte locais, NPCs, personagens, notas e acontecimentos para montar o contexto vivo desta sessão.'
+              : 'Nenhuma conexão ainda.'}
           </p>
         )}
 
@@ -314,7 +314,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                   <button
                     onClick={() => deleteLink.mutate(link.id)}
                     className="opacity-0 group-hover:opacity-100 text-parchment/30 hover:text-crimson transition-all"
-                    title="Remover conexao"
+                    title="Remover conexão"
                   >
                     <X size={12} />
                   </button>

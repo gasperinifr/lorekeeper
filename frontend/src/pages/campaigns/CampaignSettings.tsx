@@ -17,7 +17,7 @@ type InviteResult = {
   expires_at: string
 }
 
-const roleLabels: Record<string, string> = { viewer: 'Viewer', editor: 'Editor', admin: 'Admin' }
+const roleLabels: Record<string, string> = { viewer: 'Visualizador', editor: 'Editor', admin: 'Administrador' }
 const playRoleLabels: Record<string, string> = { player: 'Jogador', gm: 'Mestre' }
 const editableCampaignKeys = ['title', 'description', 'status', 'visibility']
 const serializeSettings = (value: unknown) => JSON.stringify(value ?? null)
@@ -60,7 +60,7 @@ function BannerDisplayDialog({
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt="Previa do banner"
+              alt="Prévia do banner"
               className={clsx('h-full w-full', fit === 'cover' ? 'object-cover' : 'object-contain')}
               style={{ objectPosition: position }}
             />
@@ -227,7 +227,7 @@ export function CampaignSettings() {
     setDeleteError('')
     const expected = campaign.title.trim()
     if (deleteConfirmName.trim() !== expected) {
-      setDeleteError('Para excluir a campanha, digite o nome exato no campo de confirmacao.')
+      setDeleteError('Para excluir a campanha, digite o nome exato no campo de confirmação.')
       return
     }
     await api.delete(`/campaigns/${campaignId}`)
@@ -244,9 +244,9 @@ export function CampaignSettings() {
         onChange={e => onChange({ ...value, role: e.target.value })}
         className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60"
       >
-        <option value="viewer">Viewer</option>
+        <option value="viewer">Visualizador</option>
         <option value="editor">Editor</option>
-        {canAdmin && <option value="admin">Admin</option>}
+        {canAdmin && <option value="admin">Administrador</option>}
       </select>
       <select
         value={value.play_role}
@@ -281,6 +281,39 @@ export function CampaignSettings() {
         <h2 className="text-xs text-parchment/30 uppercase tracking-widest mb-4">Informações gerais</h2>
         <form onSubmit={onSave} className="flex flex-col gap-4">
           <Input label="Título" value={val('title')} onChange={set('title')} />
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-parchment/70 font-medium">Descrição</label>
+            <textarea
+              value={val('description')}
+              onChange={set('description')}
+              rows={3}
+              className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment placeholder-parchment/40 focus:outline-none focus:border-gold/60 resize-none"
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-sm text-parchment/70 font-medium">Status</label>
+              <select value={val('status')} onChange={set('status')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
+                <option value="active">Ativa</option>
+                <option value="paused">Pausada</option>
+                <option value="completed">Concluída</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-sm text-parchment/70 font-medium">Visibilidade</label>
+              <select value={val('visibility')} onChange={set('visibility')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
+                <option value="private">Privada</option>
+                <option value="unlisted">Não listada</option>
+                <option value="public">Pública</option>
+              </select>
+            </div>
+          </div>
+
+          <Button type="submit" loading={updateCampaign.isPending} size="sm" className="self-start">
+            {saved ? 'Salvo' : 'Salvar alterações'}
+          </Button>
 
           <section className="rounded-xl border border-stone-300 bg-stone-100 p-4 flex flex-col gap-4">
             <div>
@@ -325,39 +358,6 @@ export function CampaignSettings() {
               </div>
             </div>
           </section>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-parchment/70 font-medium">Descrição</label>
-            <textarea
-              value={val('description')}
-              onChange={set('description')}
-              rows={3}
-              className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment placeholder-parchment/40 focus:outline-none focus:border-gold/60 resize-none"
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex flex-col gap-1 flex-1">
-              <label className="text-sm text-parchment/70 font-medium">Status</label>
-              <select value={val('status')} onChange={set('status')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
-                <option value="active">Ativa</option>
-                <option value="paused">Pausada</option>
-                <option value="completed">Concluída</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 flex-1">
-              <label className="text-sm text-parchment/70 font-medium">Visibilidade</label>
-              <select value={val('visibility')} onChange={set('visibility')} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment focus:outline-none focus:border-gold/60">
-                <option value="private">Privada</option>
-                <option value="unlisted">Não listada</option>
-                <option value="public">Pública</option>
-              </select>
-            </div>
-          </div>
-
-          <Button type="submit" loading={updateCampaign.isPending} size="sm" className="self-start">
-            {saved ? 'Salvo' : 'Salvar alterações'}
-          </Button>
         </form>
       </section>
 
@@ -390,9 +390,9 @@ export function CampaignSettings() {
               {canAdmin && (
                 <div className="grid grid-cols-2 gap-2">
                   <select value={m.role} onChange={e => updateMemberField(m.id, 'role', e.target.value)} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-xs text-parchment">
-                    <option value="viewer">Viewer</option>
+                    <option value="viewer">Visualizador</option>
                     <option value="editor">Editor</option>
-                    <option value="admin">Admin</option>
+                    <option value="admin">Administrador</option>
                   </select>
                   <select value={m.play_role} onChange={e => updateMemberField(m.id, 'play_role', e.target.value)} className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-xs text-parchment">
                     <option value="player">Jogador</option>

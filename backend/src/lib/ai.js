@@ -5,7 +5,7 @@ let groq
 
 function getGroq() {
   if (!process.env.GROQ_API_KEY) {
-    throw new Error('Groq nao configurado: defina GROQ_API_KEY.')
+    throw new Error('Groq não configurado: defina GROQ_API_KEY.')
   }
 
   if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -120,7 +120,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       [campaignId]
     ),
     db.query(
-      `SELECT id,name,race,class,level,description,backstory,is_active,data FROM characters
+      `SELECT id,name,race,class,level,description,backstory,is_alive,is_active,data FROM characters
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        ORDER BY name ASC
       `,
@@ -177,7 +177,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
        UNION ALL SELECT 'Criatura' AS kind, name AS label FROM creatures WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'Nota' AS kind, title AS label FROM notes WHERE campaign_id=$1 ${visibilityFilter(safeMode)} ${publicOnly ? 'AND is_secret=false' : ''}
        UNION ALL SELECT 'Arco' AS kind, title AS label FROM arcs WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       UNION ALL SELECT 'Sessao' AS kind, title AS label FROM sessions WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
+       UNION ALL SELECT 'Sessão' AS kind, title AS label FROM sessions WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'Evento' AS kind, title AS label FROM events WHERE campaign_id=$1 ${publicOnly ? "AND visibility='public'" : ''}
        ORDER BY kind, label`,
       [campaignId]
@@ -259,10 +259,10 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
 
   const blocks = [
     '<world>',
-    `Campanha: ${c.title ?? 'Campanha sem titulo'}`,
-    `Genero/cenario: ${c.scenario_type ?? 'fantasia'}`,
+    `Campanha: ${c.title ?? 'Campanha sem título'}`,
+    `Gênero/cenário: ${c.scenario_type ?? 'fantasia'}`,
     `Status: ${c.status ?? 'active'}`,
-    `Modo de informacao: ${safeMode === 'dm' ? 'DM, pode usar segredos e notas privadas' : 'Jogador, use apenas informacoes publicas'}`,
+    `Modo de informação: ${safeMode === 'dm' ? 'DM, pode usar segredos e notas privadas' : 'Jogador, use apenas informações públicas'}`,
     line('Premissa', c.description),
     renderList('Locais', locations.rows, r => {
       const data = renderData(r.data, 420, publicOnly)
@@ -285,7 +285,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     '</world>',
     '<narrative>',
     renderList('Arcos', arcs.rows, r => `- ${r.title} [${r.status ?? 'sem status'}]${r.summary ? `: ${compact(r.summary, 280)}` : ''}`),
-    renderList('Sessoes recentes', sessions.rows, r => {
+    renderList('Sessões recentes', sessions.rows, r => {
       const number = r.session_number ? `#${r.session_number} ` : ''
       const arc = r.arc_title ? ` (${r.arc_title})` : ''
       const summary = compact(r.summary, 260)
@@ -296,16 +296,16 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     renderList('Conexoes registradas', relationLines, r => r),
     '</narrative>',
     renderList(
-      '<citations>\nCitacoes clicaveis disponiveis. Ao mencionar qualquer item desta lista na resposta, escreva o nome exatamente com @ no inicio.',
+      '<citations>\nCitações clicáveis disponíveis. Ao mencionar qualquer item desta lista na resposta, escreva o nome exatamente com @ no início.',
       citationRows.rows,
       r => citationLine(r.label, r.kind)
     ),
     '</citations>',
     renderList(
-      '<chronicle>\nCronica de eventos (do mais importante ao mais recente)',
+      '<chronicle>\nCrônica de eventos (do mais importante ao mais recente)',
       events.rows,
       r => {
-        const session = r.session_title ? ` [sessao: ${r.session_title}]` : ''
+        const session = r.session_title ? ` [sessão: ${r.session_title}]` : ''
         const date = r.date_in_world ? ` | ${r.date_in_world}` : ''
         const impact = { divisor: 'DIVISOR', significativo: 'Significativo', menor: 'Menor' }[r.impact] ?? r.impact
         const linked = linksByEvent.get(r.id)?.length ? ` Ligado a: ${linksByEvent.get(r.id).join(', ')}.` : ''
@@ -315,7 +315,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     '</chronicle>',
     '<cast>',
     renderList('Personagens', characters.rows, r => {
-      const profile = [r.race, r.class, r.level && `nivel ${r.level}`].filter(Boolean).join(' ')
+      const profile = [r.race, r.class, r.level && `nivel ${r.level}`, r.is_alive === false ? 'morto' : null].filter(Boolean).join(' ')
       const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.backstory ? ` Backstory: ${compact(r.backstory, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),

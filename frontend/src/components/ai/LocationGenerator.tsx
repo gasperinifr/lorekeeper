@@ -80,14 +80,14 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
       ['Escala', getPresetValue(presets.scale, customPresets.scale)],
       ['Atmosfera', getPresetValue(presets.mood, customPresets.mood)],
       ['Importância narrativa', getPresetValue(presets.importance, customPresets.importance)],
-      ['Historia', getPresetValue(presets.history, customPresets.history)],
+      ['História', getPresetValue(presets.history, customPresets.history)],
       ['Habitantes/faccoes', getPresetValue(presets.inhabitants, customPresets.inhabitants)],
       ['Conflito atual', getPresetValue(presets.conflict, customPresets.conflict)],
     ].filter(([, value]) => value)
 
     const presetText = selected.map(([label, value]) => `${label}: ${value}`).join('; ')
     const parentText = parent
-      ? `Sub-local de: ${parent.name}. Tipo do local pai/mae: ${parent.type ?? 'nao definido'}. Descricao do local pai/mae: ${parent.description ?? 'sem descricao'}.`
+      ? `Sub-local de: ${parent.name}. Tipo do local pai/mãe: ${parent.type ?? 'não definido'}. Descrição do local pai/mãe: ${parent.description ?? 'sem descrição'}.`
       : ''
     return [hint.trim(), parentText, presetText ? `Presets escolhidos: ${presetText}.` : ''].filter(Boolean).join('\n')
   }
@@ -178,7 +178,7 @@ export function LocationGenerator({ campaignId, onClose, onCreated }: Props) {
               ['scale', 'Escala'],
               ['mood', 'Atmosfera'],
               ['importance', 'Importância'],
-              ['history', 'Historia'],
+              ['history', 'História'],
               ['inhabitants', 'Habitantes'],
               ['conflict', 'Conflito'],
             ] as const).map(([key, label]) => (
