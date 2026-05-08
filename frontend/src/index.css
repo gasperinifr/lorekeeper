@@ -13,6 +13,15 @@
 }
 
 @layer components {
+  .lk-logo {
+    font-family: "Cinzel", Georgia, serif;
+    font-size: 1.32rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    transform: translateX(-3px);
+  }
+
   .lk-rich-editor:empty::before {
     content: 'Escreva a nota...';
     color: rgb(201 192 170 / 0.32);

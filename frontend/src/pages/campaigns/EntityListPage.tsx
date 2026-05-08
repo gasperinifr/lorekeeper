@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid } from 'lucide-react'
+import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid, ArrowDownAZ } from 'lucide-react'
 import { useEntityList } from '@/hooks/useEntities'
 import { useCampaign } from '@/hooks/useCampaign'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -22,6 +22,7 @@ export function EntityListPage() {
   const [showAI, setShowAI] = useState(false)
   const [showEntityAI, setShowEntityAI] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
+  const [sortMode, setSortMode] = useState<'name-asc' | 'name-desc' | 'created-desc' | 'created-asc' | 'updated-desc' | 'updated-asc'>('name-asc')
 
   const cfg = ENTITY_CONFIG[entityType!]
   const { data, isLoading } = useEntityList(campaignId!, entityType!)
@@ -43,6 +44,28 @@ export function EntityListPage() {
   const filtered = (data ?? []).filter((e: any) => {
     const name = cfg.displayName(e).toLowerCase()
     return name.includes(search.toLowerCase())
+  })
+
+  const sorted = [...filtered].sort((a: any, b: any) => {
+    const compareName = cfg.displayName(a).localeCompare(cfg.displayName(b), 'pt-BR', { sensitivity: 'base' })
+    const compareDate = (field: 'created_at' | 'updated_at') =>
+      new Date(a[field] ?? 0).getTime() - new Date(b[field] ?? 0).getTime()
+
+    switch (sortMode) {
+      case 'name-desc':
+        return -compareName
+      case 'created-desc':
+        return -compareDate('created_at')
+      case 'created-asc':
+        return compareDate('created_at')
+      case 'updated-desc':
+        return -compareDate('updated_at')
+      case 'updated-asc':
+        return compareDate('updated_at')
+      case 'name-asc':
+      default:
+        return compareName
+    }
   })
 
   return (
@@ -109,22 +132,43 @@ export function EntityListPage() {
       </div>
 
       {/* Busca local */}
-      <div className="relative mb-6">
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-parchment/30"
-        />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={`Buscar em ${cfg.labelPlural.toLowerCase()}...`}
-          className="w-full bg-stone-100 border border-stone-300 rounded px-3 py-2 pl-8 text-sm text-parchment placeholder-parchment/30 focus:outline-none focus:border-gold/40"
-        />
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3">
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-parchment/30"
+          />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Buscar em ${cfg.labelPlural.toLowerCase()}...`}
+            className="w-full bg-stone-100 border border-stone-300 rounded px-3 py-2 pl-8 text-sm text-parchment placeholder-parchment/30 focus:outline-none focus:border-gold/40"
+          />
+        </div>
+        <div className="relative">
+          <ArrowDownAZ
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-parchment/30 pointer-events-none"
+          />
+          <select
+            value={sortMode}
+            onChange={e => setSortMode(e.target.value as typeof sortMode)}
+            className="w-full bg-stone-100 border border-stone-300 rounded px-3 py-2 pl-8 text-sm text-parchment focus:outline-none focus:border-gold/40"
+            aria-label="Ordenar entidades"
+          >
+            <option value="name-asc">A-Z</option>
+            <option value="name-desc">Z-A</option>
+            <option value="created-desc">Criação: mais novo</option>
+            <option value="created-asc">Criação: mais antigo</option>
+            <option value="updated-desc">Atualização: mais recente</option>
+            <option value="updated-asc">Atualização: mais antiga</option>
+          </select>
+        </div>
       </div>
 
       {isLoading && <p className="text-parchment/30 text-sm">Carregando...</p>}
 
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && sorted.length === 0 && (
         <EmptyState
           icon={<cfg.icon size={40} />}
           title={search ? 'Nenhum resultado.' : `Nenhum ${cfg.label.toLowerCase()} ainda.`}
@@ -146,7 +190,7 @@ export function EntityListPage() {
           ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
           : 'grid-cols-1'
       )}>
-        {filtered.map((entity: any) => (
+        {sorted.map((entity: any) => (
           <Link
             key={entity.id}
             to={`/campaigns/${campaignId}/${entityType}/${entity.id}`}

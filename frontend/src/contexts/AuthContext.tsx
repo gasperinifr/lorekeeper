@@ -11,6 +11,7 @@ interface AuthState {
 interface AuthActions {
   login:    (email: string, password: string) => Promise<void>
   register: (username: string, email: string, password: string) => Promise<void>
+  updateUsername: (username: string) => Promise<void>
   logout:   () => void
 }
 
@@ -49,13 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth(user, token)
   }
 
+  const updateUsername = async (username: string) => {
+    const { user, token } = await api.patch<{ user: User; token: string }>('/auth/me', { username })
+    setAuth(user, token)
+  }
+
   const logout = () => {
     localStorage.removeItem('lk_token')
     setState({ user: null, token: null, loading: false })
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, updateUsername, logout }}>
       {children}
     </AuthContext.Provider>
   )
