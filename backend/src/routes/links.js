@@ -1,4 +1,5 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import { filterVisibleLinks } from '../lib/audience.js'
 
 const VALID = ['characters','npcs','locations','items','spells','creatures','notes','sessions','arcs','encounters']
 const RELATION_TYPES = ['alianca','rivalidade','familia','lealdade','segredo','divida','amor','odio','mentor','neutro','outro']
@@ -14,7 +15,7 @@ export async function linkRoutes(fastify) {
 
   fastify.get('/campaigns/:campaignId/links', { preHandler: requireCampaignAccess }, async (req, reply) => {
     const { rows } = await db.query('SELECT * FROM entity_links WHERE campaign_id=$1 ORDER BY created_at DESC', [req.params.campaignId])
-    return reply.send(rows)
+    return reply.send(await filterVisibleLinks(db, req, rows))
   })
 
   fastify.post('/campaigns/:campaignId/links', { preHandler: requireEditor }, async (req, reply) => {
@@ -46,6 +47,6 @@ export async function linkRoutes(fastify) {
       `SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type=$2 AND source_id=$3) OR (target_type=$2 AND target_id=$3))`,
       [req.params.campaignId, req.params.type, req.params.id]
     )
-    return reply.send(rows)
+    return reply.send(await filterVisibleLinks(db, req, rows))
   })
 }

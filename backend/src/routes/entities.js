@@ -1,4 +1,12 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import {
+  buildAudienceFilter,
+  canViewDm,
+  filterVisibleLinks as filterLinksByAudience,
+  protectPrivateWrite,
+  sanitizeEntityRow,
+  sanitizeEntityRows,
+} from '../lib/audience.js'
 
 const AUDIENCE_FIELDS = ['visibility', 'shared_with_user_id']
 const ENTITY_CONFIG = {
@@ -39,46 +47,15 @@ const ENTITY_CONFIG = {
   },
 }
 
-function isAdmin(req) {
-  return req.campaignRole === 'admin'
-}
-
-function isGm(req) {
-  return req.campaignPlayRole === 'gm'
-}
-
-function isEditor(req) {
-  return req.campaignRole === 'editor'
-}
-
 function normalizeVisibility(value) {
   return ['public', 'private', 'gm', 'user'].includes(value) ? value : 'public'
 }
 
-function buildAudienceFilter(cfg, req, startIdx = 1, alias = '', includeSharedTarget = true) {
-  if (isAdmin(req)) return { sql: '', vals: [], nextIdx: startIdx }
-
-  const p = alias ? `${alias}.` : ''
-  const vals = []
-  let i = startIdx
-  const rules = [`${p}visibility='public'`]
-  if (isEditor(req)) rules.push(`${p}visibility='private'`)
-  if (isGm(req)) rules.push(`${p}visibility IN ('gm','user')`)
-
-  rules.push(`${p}created_by=$${i++}`)
-  vals.push(req.user.id)
-  if (includeSharedTarget) {
-    rules.push(`${p}shared_with_user_id=$${i++}`)
-    vals.push(req.user.id)
-  }
-
-  let sql = `AND (${rules.join(' OR ')})`
-  if (cfg.table === 'notes' && !isGm(req)) {
-    sql += ` AND (${p}is_secret=false OR ${p}created_by=$${i++})`
-    vals.push(req.user.id)
-  }
-
-  return { sql, vals, nextIdx: i }
+function sanitizeTree(nodes, req, table) {
+  return nodes.map(node => ({
+    ...sanitizeEntityRow(node, req, table),
+    children: sanitizeTree(node.children ?? [], req, table),
+  }))
 }
 
 async function normalizeAudience(db, req, body, existing = {}) {
@@ -87,7 +64,7 @@ async function normalizeAudience(db, req, body, existing = {}) {
   const visibility = next.visibility ?? existing.visibility ?? 'public'
 
   if (visibility === 'user') {
-    if (!isAdmin(req) && !isGm(req)) {
+    if (!canViewDm(req)) {
       return { error: 'Apenas admins ou mestre podem compartilhar com um usuario unico.' }
     }
     const targetId = next.shared_with_user_id ?? existing.shared_with_user_id
@@ -153,25 +130,8 @@ async function validateLocationParent(db, campaignId, locationId, parentId, repl
   return true
 }
 
-async function canReadEntity(db, req, entityType, id) {
-  const cfg = ENTITY_CONFIG[entityType]
-  if (!cfg) return true
-  const access = buildAudienceFilter(cfg, req, 3)
-  const { rows } = await db.query(
-    `SELECT id FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`,
-    [id, req.params.campaignId, ...access.vals]
-  )
-  return rows.length > 0
-}
-
 async function filterVisibleLinks(db, req, entityType, id, links) {
-  const visible = []
-  for (const link of links) {
-    const otherType = link.source_type === entityType && link.source_id === id ? link.target_type : link.source_type
-    const otherId = link.source_type === entityType && link.source_id === id ? link.target_id : link.source_id
-    if (await canReadEntity(db, req, otherType, otherId)) visible.push(link)
-  }
-  return visible
+  return filterLinksByAudience(db, req, links)
 }
 
 export async function entityRoutes(fastify) {
@@ -186,7 +146,7 @@ export async function entityRoutes(fastify) {
         `SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE campaign_id=$1 ${access.sql} ORDER BY ${cfg.listOrder}`,
         [req.params.campaignId, ...access.vals]
       )
-      return reply.send(rows)
+      return reply.send(sanitizeEntityRows(rows, req, cfg.table))
     })
 
     fastify.post(base, { preHandler: requireEditor }, async (req, reply) => {
@@ -199,11 +159,12 @@ export async function entityRoutes(fastify) {
       }
       const audience = await normalizeAudience(db, req, req.body)
       if (audience.error) return reply.status(403).send({ error: audience.error })
-      const { cols, vals, placeholders } = buildInsert(cfg, audience.body, req.params.campaignId, req.user.id)
+      const safeBody = protectPrivateWrite(audience.body, req)
+      const { cols, vals, placeholders } = buildInsert(cfg, safeBody, req.params.campaignId, req.user.id)
       const { rows } = await db.query(
         `INSERT INTO ${cfg.table} (${cols.join(',')}) VALUES (${placeholders.join(',')}) RETURNING *`, vals
       )
-      return reply.status(201).send(rows[0])
+      return reply.status(201).send(sanitizeEntityRow(rows[0], req, cfg.table))
     })
 
     fastify.get(`${base}/:id`, { preHandler: requireCampaignAccess }, async (req, reply) => {
@@ -226,7 +187,7 @@ export async function entityRoutes(fastify) {
       ])
       if (!e.rows.length) return reply.status(404).send({ error: 'Entidade nao encontrada.' })
       const links = await filterVisibleLinks(db, req, entityType, req.params.id, l.rows)
-      return reply.send({ ...e.rows[0], links, event_links: ev.rows, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole })
+      return reply.send({ ...sanitizeEntityRow(e.rows[0], req, cfg.table), links, event_links: ev.rows, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole, _can_view_dm: canViewDm(req) })
     })
 
     fastify.patch(`${base}/:id`, { preHandler: requireEditor }, async (req, reply) => {
@@ -243,13 +204,14 @@ export async function entityRoutes(fastify) {
       }
       const audience = await normalizeAudience(db, req, req.body, existing[0])
       if (audience.error) return reply.status(403).send({ error: audience.error })
-      const { sets, vals, nextIdx } = buildUpdate(cfg, audience.body)
+      const safeBody = protectPrivateWrite(audience.body, req, existing[0])
+      const { sets, vals, nextIdx } = buildUpdate(cfg, safeBody)
       if (!sets.length) return reply.status(400).send({ error: 'Nenhum campo para atualizar.' })
       vals.push(req.params.id, req.params.campaignId)
       const { rows } = await db.query(
         `UPDATE ${cfg.table} SET ${sets.join(',')} WHERE id=$${nextIdx} AND campaign_id=$${nextIdx+1} RETURNING *`, vals
       )
-      return reply.send(rows[0])
+      return reply.send(sanitizeEntityRow(rows[0], req, cfg.table))
     })
 
     fastify.delete(`${base}/:id`, { preHandler: requireEditor }, async (req, reply) => {
@@ -282,6 +244,6 @@ export async function entityRoutes(fastify) {
       if (row.parent_id && map[row.parent_id]) map[row.parent_id].children.push(map[row.id])
       else roots.push(map[row.id])
     }
-    return reply.send(roots)
+    return reply.send(sanitizeTree(roots, req, cfg.table))
   })
 }

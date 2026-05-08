@@ -118,7 +118,7 @@ export function OraclePage() {
   const [pendingPrompt, setPendingPrompt] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const canUseDm = ['admin', 'editor'].includes(campaign?.role ?? '')
+  const canUseDm = campaign?.role === 'admin' || campaign?.play_role === 'gm'
   const effectiveMode: OracleMode = canUseDm ? mode : 'player'
   const { data, isLoading } = useOracleHistory(campaignId!, effectiveMode)
   const sendMessage = useSendOracleMessage(campaignId!, effectiveMode)

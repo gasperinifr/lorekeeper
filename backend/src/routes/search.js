@@ -1,4 +1,5 @@
 import { requireCampaignAccess } from '../middleware/authenticate.js'
+import { buildAudienceFilter } from '../lib/audience.js'
 
 const SEARCHABLE = [
   { table: 'characters', label: 'characters', fields: ['name','description','backstory'], audience: true },
@@ -11,27 +12,6 @@ const SEARCHABLE = [
   { table: 'arcs',       label: 'arcs',       fields: ['title','summary'] },
   { table: 'sessions',   label: 'sessions',   fields: ['title','summary'] },
 ]
-
-function buildAudienceFilter(table, req, startIdx) {
-  if (req.campaignRole === 'admin') return { sql: '', vals: [] }
-
-  const vals = []
-  let i = startIdx
-  const rules = ["visibility='public'"]
-  if (req.campaignRole === 'editor') rules.push("visibility='private'")
-  if (req.campaignPlayRole === 'gm') rules.push("visibility IN ('gm','user')")
-  rules.push(`created_by=$${i++}`)
-  vals.push(req.user.id)
-  rules.push(`shared_with_user_id=$${i++}`)
-  vals.push(req.user.id)
-
-  let sql = ` AND (${rules.join(' OR ')})`
-  if (table === 'notes' && req.campaignPlayRole !== 'gm') {
-    sql += ` AND (is_secret=false OR created_by=$${i++})`
-    vals.push(req.user.id)
-  }
-  return { sql, vals }
-}
 
 export async function searchRoutes(fastify) {
   const { db } = fastify
@@ -50,7 +30,7 @@ export async function searchRoutes(fastify) {
 
       if (audience) {
         const access = buildAudienceFilter(table, req, 3)
-        query += access.sql
+        query += ` ${access.sql}`
         params.push(...access.vals)
       } else if (!canSeeLegacyPrivate) {
         query += " AND visibility='public'"

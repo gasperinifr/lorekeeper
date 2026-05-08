@@ -334,7 +334,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
             ))}
 
             {/* Segredos do mestre */}
-            {secretsField && entity.secrets && (
+            {entity._can_view_dm && secretsField && entity.secrets && (
               <div className="bg-crimson/10 border border-crimson/20 rounded-lg p-4">
                 <h3 className="text-xs text-crimson/70 uppercase tracking-widest mb-2">
                   🔒 {secretsField.label}

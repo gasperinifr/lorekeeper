@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { BookMarked, Calendar, GitBranch, Link2 } from 'lucide-react'
+import { BookMarked, Calendar, Crosshair, GitBranch, Link2, ZoomIn, ZoomOut } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
 import { useEntityList } from '@/hooks/useEntities'
@@ -135,6 +135,9 @@ export function RelationshipGraphPage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const svgRef = useRef<SVGSVGElement>(null)
+  const zoomRef = useRef<any>(null)
+  const lastTransformRef = useRef<any>(null)
+  const didDragRef = useRef(false)
   const [enabledTypes, setEnabledTypes] = useState<GraphType[]>(GRAPH_TYPES)
   const [size, setSize] = useState({ width: 960, height: 620 })
   const [version, setVersion] = useState(0)
@@ -291,14 +294,17 @@ export function RelationshipGraphPage() {
       })
 
     const zoom = d3.zoom()
-      .scaleExtent([0.35, 2.6])
+      .scaleExtent([0.06, 4.5])
       .on('zoom', (event: any) => {
+        lastTransformRef.current = event.transform
         d3.select(svg).select('.graph-stage').attr('transform', event.transform)
       })
+    zoomRef.current = zoom
     d3.select(svg).call(zoom)
 
     const drag = d3.drag()
       .on('start', (event: any, node: GraphNode) => {
+        didDragRef.current = false
         if (!event.active) simulation.alphaTarget(0.25).restart()
         const target = simulationNodes.find((entry: GraphNode) => entry.id === node.id)
         if (target) {
@@ -307,24 +313,63 @@ export function RelationshipGraphPage() {
         }
       })
       .on('drag', (event: any, node: GraphNode) => {
+        didDragRef.current = true
         const target = simulationNodes.find((entry: GraphNode) => entry.id === node.id)
         if (target) {
           target.fx = event.x
           target.fy = event.y
+          node.fx = event.x
+          node.fy = event.y
         }
       })
       .on('end', (event: any, node: GraphNode) => {
         if (!event.active) simulation.alphaTarget(0)
         const target = simulationNodes.find((entry: GraphNode) => entry.id === node.id)
         if (target) {
-          target.fx = null
-          target.fy = null
+          target.fx = target.x
+          target.fy = target.y
+          node.fx = target.x
+          node.fy = target.y
         }
       })
 
-    d3.select(svg).selectAll('.graph-node-circle').call(drag)
+    d3.select(svg)
+      .selectAll('.graph-node')
+      .datum(function (this: SVGGElement) {
+        return simulationNodes.find((node: GraphNode) => node.id === this.getAttribute('data-node-id'))
+      })
+      .call(drag)
     return () => simulation.stop()
   }, [edges, nodes, size.height, size.width])
+
+  const transformGraph = (action: 'in' | 'out' | 'fit') => {
+    const d3 = window.d3
+    const svg = svgRef.current
+    if (!d3 || !svg || !zoomRef.current) return
+    const selection = d3.select(svg)
+
+    if (action === 'fit') {
+      const positioned = nodes.filter(node => Number.isFinite(node.x) && Number.isFinite(node.y))
+      if (!positioned.length) return
+      const padding = 96
+      const minX = Math.min(...positioned.map(node => node.x!))
+      const maxX = Math.max(...positioned.map(node => node.x!))
+      const minY = Math.min(...positioned.map(node => node.y!))
+      const maxY = Math.max(...positioned.map(node => node.y!))
+      const graphWidth = Math.max(1, maxX - minX + padding * 2)
+      const graphHeight = Math.max(1, maxY - minY + padding * 2)
+      const scale = Math.min(2.2, Math.max(0.06, Math.min(size.width / graphWidth, size.height / graphHeight)))
+      const tx = size.width / 2 - scale * ((minX + maxX) / 2)
+      const ty = size.height / 2 - scale * ((minY + maxY) / 2)
+      selection.transition().duration(260).call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+      return
+    }
+
+    selection.transition().duration(180).call(
+      action === 'in' ? zoomRef.current.scaleBy : zoomRef.current.scaleBy,
+      action === 'in' ? 1.25 : 0.8
+    )
+  }
 
   const toggleType = (type: GraphType) => {
     setEnabledTypes(current =>
@@ -346,6 +391,17 @@ export function RelationshipGraphPage() {
               <h1 className="font-display text-2xl text-parchment">Gráfico de Relacionamentos</h1>
               <p className="text-sm text-parchment/35">{nodes.length} Entidades, {edges.length} Relacionamentos</p>
             </div>
+          </div>
+          <div className="flex items-center gap-1 rounded border border-stone-300 bg-stone-100 p-1">
+            <button type="button" onClick={() => transformGraph('out')} className="h-8 w-8 rounded text-parchment/45 hover:text-parchment hover:bg-stone-200 transition-colors" title="Afastar zoom" aria-label="Afastar zoom">
+              <ZoomOut size={15} className="mx-auto" />
+            </button>
+            <button type="button" onClick={() => transformGraph('fit')} className="h-8 w-8 rounded text-parchment/45 hover:text-gold hover:bg-stone-200 transition-colors" title="Centralizar grafo" aria-label="Centralizar grafo">
+              <Crosshair size={15} className="mx-auto" />
+            </button>
+            <button type="button" onClick={() => transformGraph('in')} className="h-8 w-8 rounded text-parchment/45 hover:text-parchment hover:bg-stone-200 transition-colors" title="Aproximar zoom" aria-label="Aproximar zoom">
+              <ZoomIn size={15} className="mx-auto" />
+            </button>
           </div>
         </div>
 
@@ -421,11 +477,17 @@ export function RelationshipGraphPage() {
                     <g
                       key={node.id}
                       data-node-id={node.id}
-                      className="graph-node cursor-pointer"
+                      className="graph-node cursor-grab active:cursor-grabbing"
                       transform={`translate(${x}, ${y})`}
-                      onClick={() => navigate(node.path)}
+                      onClick={() => {
+                        if (didDragRef.current) {
+                          didDragRef.current = false
+                          return
+                        }
+                        navigate(node.path)
+                      }}
                     >
-                      <circle className="graph-node-circle" r={25} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.6} style={{ cursor: 'grab' }} />
+                      <circle className="graph-node-circle" r={25} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.6} />
                       <foreignObject x={-10} y={-10} width={20} height={20} className="pointer-events-none">
                         <Icon size={20} color={node.color} />
                       </foreignObject>

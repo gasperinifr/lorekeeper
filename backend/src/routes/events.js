@@ -1,4 +1,5 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import { filterVisibleEventEntityLinks } from '../lib/audience.js'
 
 const VALID_TYPES = [
   'batalha', 'revelacao', 'morte', 'alianca', 'descoberta',
@@ -17,6 +18,7 @@ export async function eventRoutes(fastify) {
     const { campaignId } = req.params
     const isEditor = ['admin', 'editor'].includes(req.campaignRole)
     const visFilter = isEditor ? '' : "AND e.visibility='public'"
+    const relatedFilter = isEditor ? '' : "AND visibility='public'"
 
     const { rows: events } = await db.query(
       `SELECT e.*,
@@ -24,8 +26,8 @@ export async function eventRoutes(fastify) {
               a.title AS arc_title,
               u.username AS created_by_username
        FROM events e
-       LEFT JOIN sessions s ON s.id = e.session_id
-       LEFT JOIN arcs a ON a.id = e.arc_id
+       LEFT JOIN sessions s ON s.id = e.session_id ${relatedFilter.replace('visibility', 's.visibility')}
+       LEFT JOIN arcs a ON a.id = e.arc_id ${relatedFilter.replace('visibility', 'a.visibility')}
        LEFT JOIN users u ON u.id = e.created_by
        WHERE e.campaign_id=$1 ${visFilter}
        ORDER BY e.created_at DESC`,
@@ -40,8 +42,9 @@ export async function eventRoutes(fastify) {
       [eventIds]
     )
 
+    const visibleLinks = await filterVisibleEventEntityLinks(db, req, links)
     const linksByEvent = {}
-    for (const l of links) {
+    for (const l of visibleLinks) {
       if (!linksByEvent[l.event_id]) linksByEvent[l.event_id] = []
       linksByEvent[l.event_id].push(l)
     }
@@ -53,12 +56,13 @@ export async function eventRoutes(fastify) {
     const { campaignId, eventId } = req.params
     const isEditor = ['admin', 'editor'].includes(req.campaignRole)
     const visFilter = isEditor ? '' : "AND e.visibility='public'"
+    const relatedFilter = isEditor ? '' : "AND visibility='public'"
 
     const { rows } = await db.query(
       `SELECT e.*, s.title AS session_title, a.title AS arc_title
        FROM events e
-       LEFT JOIN sessions s ON s.id = e.session_id
-       LEFT JOIN arcs a ON a.id = e.arc_id
+       LEFT JOIN sessions s ON s.id = e.session_id ${relatedFilter.replace('visibility', 's.visibility')}
+       LEFT JOIN arcs a ON a.id = e.arc_id ${relatedFilter.replace('visibility', 'a.visibility')}
        WHERE e.id=$1 AND e.campaign_id=$2 ${visFilter}`,
       [eventId, campaignId]
     )
@@ -69,7 +73,7 @@ export async function eventRoutes(fastify) {
       [eventId]
     )
 
-    return reply.send({ ...rows[0], entity_links: links })
+    return reply.send({ ...rows[0], entity_links: await filterVisibleEventEntityLinks(db, req, links) })
   })
 
   fastify.post('/campaigns/:campaignId/events', { preHandler: requireEditor }, async (req, reply) => {

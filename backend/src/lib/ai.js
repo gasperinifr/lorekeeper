@@ -47,9 +47,12 @@ function line(label, value) {
   return text ? `${label}: ${text}` : null
 }
 
-function renderData(data, max = 420) {
+const PRIVATE_DATA_KEYS = new Set(['dm_notes', 'plot_hook', 'secret', 'secrets', 'curse'])
+
+function renderData(data, max = 420, publicOnly = false) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return ''
-  const entries = Object.entries(data).filter(([, value]) => {
+  const entries = Object.entries(data).filter(([key, value]) => {
+    if (publicOnly && PRIVATE_DATA_KEYS.has(key)) return false
     if (value === null || value === undefined || value === '') return false
     if (Array.isArray(value)) return value.length > 0
     if (typeof value === 'object') return Object.keys(value).length > 0
@@ -105,7 +108,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       `SELECT s.id,s.title,s.session_number,s.summary,s.dm_notes,s.played_at,s.status,a.title AS arc_title
        FROM sessions s
        LEFT JOIN arcs a ON a.id=s.arc_id
-       WHERE s.campaign_id=$1 ${visibilityFilter(safeMode, 's')}
+       WHERE s.campaign_id=$1 ${visibilityFilter(safeMode, 's')} ${publicOnly ? "AND COALESCE(a.visibility='public', true)" : ''}
        ORDER BY COALESCE(s.played_at, s.created_at) DESC
        LIMIT 10`,
       [campaignId]
@@ -157,7 +160,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       `SELECT e.id, e.title, e.type, e.impact, e.date_in_world, e.description,
               s.title AS session_title
        FROM events e
-       LEFT JOIN sessions s ON s.id = e.session_id
+       LEFT JOIN sessions s ON s.id = e.session_id ${publicOnly ? "AND s.visibility='public'" : ''}
        WHERE e.campaign_id=$1 ${publicOnly ? "AND e.visibility='public'" : ''}
        ORDER BY
          CASE e.impact WHEN 'divisor' THEN 1 WHEN 'significativo' THEN 2 ELSE 3 END,
@@ -262,20 +265,20 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     `Modo de informacao: ${safeMode === 'dm' ? 'DM, pode usar segredos e notas privadas' : 'Jogador, use apenas informacoes publicas'}`,
     line('Premissa', c.description),
     renderList('Locais', locations.rows, r => {
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${r.type ? ` (${r.type})` : ''}${r.description ? `: ${compact(r.description, 260)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     renderList('Itens notaveis', items.rows, r => {
       const parts = [r.type, r.rarity].filter(Boolean).join(', ')
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${parts ? ` (${parts})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.properties ? ` Propriedades: ${compact(r.properties, 180)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     renderList('Criaturas', creatures.rows, r => {
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${r.type || r.cr ? ` (${[r.type, r.cr && `CR ${r.cr}`].filter(Boolean).join(', ')})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     renderList('Magias', spells.rows, r => {
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       const meta = [r.level !== null && `nivel ${r.level}`, r.school, r.casting_time, r.range, r.duration, r.components].filter(Boolean).join(', ')
       return `- ${r.name}${meta ? ` (${meta})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
@@ -313,13 +316,13 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     '<cast>',
     renderList('Personagens', characters.rows, r => {
       const profile = [r.race, r.class, r.level && `nivel ${r.level}`].filter(Boolean).join(' ')
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.backstory ? ` Backstory: ${compact(r.backstory, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     renderList('NPCs', npcs.rows, r => {
       const profile = [r.race, r.role, r.is_alive === false ? 'morto' : null].filter(Boolean).join(', ')
       const hook = typeof r.data?.hook === 'string' ? compact(r.data.hook, 220) : ''
-      const data = renderData(r.data)
+      const data = renderData(r.data, 420, publicOnly)
       return `- ${r.name}${profile ? ` (${profile})` : ''}${r.description ? `: ${compact(r.description, 220)}` : ''}${r.personality ? ` Personalidade: ${compact(r.personality, 160)}` : ''}${hook ? ` Como encontrar: ${hook}` : ''}${safeMode === 'dm' && r.secrets ? ` Segredos: ${compact(r.secrets, 220)}` : ''}${data ? ` Dados: ${data}` : ''}`
     }),
     '</cast>',

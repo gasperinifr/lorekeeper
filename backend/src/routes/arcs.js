@@ -1,4 +1,5 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import { canViewDm, filterVisibleLinks, sanitizeEntityRow, sanitizeEntityRows } from '../lib/audience.js'
 
 export async function arcRoutes(fastify) {
   const { db } = fastify
@@ -26,7 +27,7 @@ export async function arcRoutes(fastify) {
        ORDER BY COALESCE(s.played_at, s.created_at) DESC,s.session_number DESC`,
       [req.params.campaignId]
     )
-    return reply.send(rows)
+    return reply.send(sanitizeEntityRows(rows, req, 'sessions'))
   })
 
   fastify.post('/campaigns/:campaignId/arcs', { preHandler: requireEditor }, async (req, reply) => {
@@ -51,7 +52,13 @@ export async function arcRoutes(fastify) {
       db.query(`SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type='arcs' AND source_id=$2) OR (target_type='arcs' AND target_id=$2))`, [req.params.campaignId, req.params.arcId]),
     ])
     if (!a.rows.length) return reply.status(404).send({ error: 'Arco não encontrado.' })
-    return reply.send({ ...a.rows[0], sessions: s.rows, links: l.rows, _role: req.campaignRole })
+    return reply.send({
+      ...a.rows[0],
+      sessions: sanitizeEntityRows(s.rows, req, 'sessions'),
+      links: await filterVisibleLinks(db, req, l.rows),
+      _role: req.campaignRole,
+      _can_view_dm: canViewDm(req),
+    })
   })
 
   fastify.patch('/campaigns/:campaignId/arcs/:arcId', { preHandler: requireEditor }, async (req, reply) => {
@@ -86,10 +93,11 @@ export async function arcRoutes(fastify) {
   fastify.post('/campaigns/:campaignId/arcs/:arcId/sessions', { preHandler: requireEditor }, async (req, reply) => {
     const { title, session_number, summary, dm_notes, played_at, duration_min, status, visibility } = req.body
     if (!title) return reply.status(400).send({ error: 'title é obrigatório.' })
+    const safeDmNotes = canViewDm(req) ? dm_notes : null
     const { rows } = await db.query(
       `INSERT INTO sessions (arc_id,campaign_id,title,session_number,summary,dm_notes,played_at,duration_min,status,visibility)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [req.params.arcId, req.params.campaignId, title, session_number, summary, dm_notes, played_at, duration_min, status ?? 'planned', visibility ?? 'public']
+      [req.params.arcId, req.params.campaignId, title, session_number, summary, safeDmNotes, played_at, duration_min, status ?? 'planned', visibility ?? 'public']
     )
     return reply.status(201).send(rows[0])
   })
@@ -105,14 +113,22 @@ export async function arcRoutes(fastify) {
     ])
     if (!s.rows.length) return reply.status(404).send({ error: 'Sessão não encontrada.' })
     const session = s.rows[0]
-    if (!isEditor) delete session.dm_notes
-    return reply.send({ ...session, encounters: e.rows, links: l.rows, _role: req.campaignRole })
+    return reply.send({
+      ...sanitizeEntityRow(session, req, 'sessions'),
+      encounters: e.rows,
+      links: await filterVisibleLinks(db, req, l.rows),
+      _role: req.campaignRole,
+      _can_view_dm: canViewDm(req),
+    })
   })
 
   fastify.patch('/campaigns/:campaignId/arcs/:arcId/sessions/:sessionId', { preHandler: requireEditor }, async (req, reply) => {
     const fields = ['title','session_number','summary','dm_notes','played_at','duration_min','status','visibility']
     const sets = []; const vals = []; let i = 1
-    for (const f of fields) { if (req.body[f] !== undefined) { sets.push(`${f}=$${i++}`); vals.push(req.body[f]) } }
+    for (const f of fields) {
+      if (f === 'dm_notes' && !canViewDm(req)) continue
+      if (req.body[f] !== undefined) { sets.push(`${f}=$${i++}`); vals.push(req.body[f]) }
+    }
     if (!sets.length) return reply.status(400).send({ error: 'Nenhum campo para atualizar.' })
     sets.push('updated_at=NOW()')
     vals.push(req.params.sessionId, req.params.campaignId)

@@ -1,5 +1,6 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
 import { complete, completeMessages, getCampaignContextFull } from '../lib/ai.js'
+import { canViewDm } from '../lib/audience.js'
 
 export async function aiRoutes(fastify) {
   const { db } = fastify
@@ -103,8 +104,9 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: maximo 2 frases 
     if (!rows.length) return reply.status(404).send({ error: 'Sessao nao encontrada.' })
     const ctx = await getCampaignContext(req.params.campaignId)
     const s = rows[0]
+    const notes = canViewDm(req) ? s.dm_notes : ''
     const text = await complete(SYSTEM,
-      `${ctx}\n\nSessao: "${s.title}"\nNotas: ${s.dm_notes ?? '(sem notas)'}\nEncontros: ${s.encounters?.map(e => e.title).filter(Boolean).join(', ') || 'nenhum'}\n\nEscreva um resumo narrativo em 3-5 paragrafos, terceira pessoa. Retorne apenas o texto.`,
+      `${ctx}\n\nSessao: "${s.title}"\nNotas: ${notes ?? '(sem notas)'}\nEncontros: ${s.encounters?.map(e => e.title).filter(Boolean).join(', ') || 'nenhum'}\n\nEscreva um resumo narrativo em 3-5 paragrafos, terceira pessoa. Retorne apenas o texto.`,
       1000
     )
     return reply.send({ summary: text })
@@ -250,7 +252,7 @@ So inclua sugestoes com confidence >= 0.6. Se nao houver, retorne {"suggestions"
   function oracleMode(req) {
     const requested = req.body?.mode ?? req.query?.mode
     const wantsDm = requested === 'dm'
-    const canDm = ['admin', 'editor'].includes(req.campaignRole)
+    const canDm = canViewDm(req)
     return wantsDm && canDm ? 'dm' : 'player'
   }
 
