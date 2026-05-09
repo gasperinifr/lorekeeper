@@ -4,6 +4,19 @@ import { canViewDm } from '../lib/audience.js'
 
 export async function aiRoutes(fastify) {
   const { db } = fastify
+  const LINK_RELATION_TYPES = ['alianca','rivalidade','familia','lealdade','segredo','divida','amor','odio','mentor','neutro','outro']
+  const LINK_TYPE_ALIASES = {
+    character: 'characters',
+    characters: 'characters',
+    npc: 'npcs',
+    npcs: 'npcs',
+    location: 'locations',
+    locations: 'locations',
+    item: 'items',
+    items: 'items',
+    group: 'groups',
+    groups: 'groups',
+  }
 
   function parseJSON(text) {
     try { return JSON.parse(text) } catch {}
@@ -13,18 +26,20 @@ export async function aiRoutes(fastify) {
   }
 
   async function getCampaignContext(campaignId) {
-    const [camp, npcs, locs, chars] = await Promise.all([
+    const [camp, npcs, locs, chars, groups] = await Promise.all([
       db.query('SELECT title,description,scenario_type FROM campaigns WHERE id=$1', [campaignId]),
       db.query('SELECT name,role,race FROM npcs WHERE campaign_id=$1 LIMIT 20', [campaignId]),
       db.query('SELECT name,type FROM locations WHERE campaign_id=$1 LIMIT 20', [campaignId]),
       db.query('SELECT name,race,class FROM characters WHERE campaign_id=$1', [campaignId]),
+      db.query('SELECT name,type FROM groups WHERE campaign_id=$1 LIMIT 20', [campaignId]),
     ])
     const c = camp.rows[0]
     return `Campanha: "${c.title}" (${c.scenario_type ?? 'fantasia'})
 Descrição: ${c.description ?? 'não definida'}
 Personagens: ${chars.rows.map(r => `${r.name} (${r.race} ${r.class})`).join(', ') || 'nenhum'}
 NPCs: ${npcs.rows.map(r => `${r.name} (${r.role})`).join(', ') || 'nenhum'}
-Locais: ${locs.rows.map(r => `${r.name} (${r.type})`).join(', ') || 'nenhum'}`
+Locais: ${locs.rows.map(r => `${r.name} (${r.type})`).join(', ') || 'nenhum'}
+Grupos: ${groups.rows.map(r => `${r.name} (${r.type})`).join(', ') || 'nenhum'}`
   }
 
   const SYSTEM = `Você é um assistente especialista em D&D 5e e narrativa de RPG de mesa.
@@ -204,11 +219,12 @@ IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva e
     try {
       const { entity_type, entity_id, name, description } = req.body
 
-      const [chars, npcs, locs, items] = await Promise.all([
+      const [chars, npcs, locs, items, groups] = await Promise.all([
         db.query('SELECT id,name FROM characters WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
         db.query('SELECT id,name FROM npcs WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
         db.query('SELECT id,name,type FROM locations WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
         db.query('SELECT id,name FROM items WHERE campaign_id=$1 LIMIT 20', [req.params.campaignId]),
+        db.query('SELECT id,name,type FROM groups WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
       ])
 
       const allEntities = [
@@ -216,6 +232,7 @@ IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva e
         ...npcs.rows.map(r => ({ ...r, type: 'npcs' })),
         ...locs.rows.map(r => ({ ...r, type: 'locations' })),
         ...items.rows.map(r => ({ ...r, type: 'items' })),
+        ...groups.rows.map(r => ({ ...r, type: 'groups' })),
       ].filter(e => !(e.type === entity_type && e.id === entity_id))
 
       if (!allEntities.length) return reply.send({ suggestions: [] })
@@ -230,18 +247,30 @@ ${entityList}
 
 Identifique até 3 conexões que fazem sentido narrativo entre a nova entidade e as existentes.
 Retorne JSON:
-{"suggestions":[{"target_id":"uuid","target_type":"tipo","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|odio|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
+{"suggestions":[{"target_id":"uuid-sem-prefixo","target_type":"characters|npcs|locations|items|groups","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|odio|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
+Use exatamente um dos ids listados. Nao invente ids, nao use nomes como id e nao inclua prefixos como "npcs/" dentro de target_id.
 Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
         600
       )
       const parsed = parseJSON(text)
       const suggestions = (parsed.suggestions ?? [])
         .filter(s => Number(s.confidence ?? 0) >= 0.6)
-        .slice(0, 3)
         .map(s => {
-          const target = allEntities.find(e => e.id === s.target_id && e.type === s.target_type)
-          return target ? { ...s, target_name: target.name } : s
+          const { targetType, targetId } = normalizeSuggestedTarget(s)
+          const target = allEntities.find(e => e.id === targetId && e.type === targetType)
+          if (!target) return null
+          const relationType = LINK_RELATION_TYPES.includes(s.relation_type) ? s.relation_type : 'outro'
+          return {
+            target_id: target.id,
+            target_type: target.type,
+            target_name: target.name,
+            relation_type: relationType,
+            relation_label: s.relation_label,
+            confidence: Number(s.confidence ?? 0),
+          }
         })
+        .filter(Boolean)
+        .slice(0, 3)
       return reply.send({ suggestions })
     } catch (err) {
       req.log.error({ err }, 'Falha ao sugerir links')
@@ -254,6 +283,18 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
     const wantsDm = requested === 'dm'
     const canDm = canViewDm(req)
     return wantsDm && canDm ? 'dm' : 'player'
+  }
+
+  function normalizeSuggestedTarget(suggestion) {
+    const rawType = String(suggestion.target_type ?? '').trim().toLowerCase()
+    let targetType = LINK_TYPE_ALIASES[rawType] ?? rawType
+    let targetId = String(suggestion.target_id ?? '').trim()
+    const typedId = targetId.match(/^([a-z_]+)\/(.+)$/i)
+    if (typedId) {
+      targetType = LINK_TYPE_ALIASES[typedId[1].toLowerCase()] ?? typedId[1].toLowerCase()
+      targetId = typedId[2].trim()
+    }
+    return { targetType, targetId }
   }
 
   function oracleSystemPrompt(context, mode) {

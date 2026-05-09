@@ -94,6 +94,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     creatures,
     notes,
     events,
+    groups,
     citationRows,
   ] = await Promise.all([
     db.query('SELECT title,description,scenario_type,status FROM campaigns WHERE id=$1', [campaignId]),
@@ -169,6 +170,17 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       [campaignId]
     ),
     db.query(
+      `SELECT g.id, g.name, g.type, g.description, g.headquarters, g.motto,
+              CASE WHEN $2 THEN g.secrets ELSE NULL END AS secrets,
+              COUNT(gm.id) AS member_count
+       FROM groups g
+       LEFT JOIN group_members gm ON gm.group_id = g.id
+       WHERE g.campaign_id=$1 ${visibilityFilter(safeMode, 'g')}
+       GROUP BY g.id
+       ORDER BY g.name ASC`,
+      [campaignId, !publicOnly]
+    ),
+    db.query(
       `SELECT 'Personagem' AS kind, name AS label FROM characters WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'NPC' AS kind, name AS label FROM npcs WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'Local' AS kind, name AS label FROM locations WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
@@ -179,6 +191,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
        UNION ALL SELECT 'Arco' AS kind, title AS label FROM arcs WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'Sessão' AS kind, title AS label FROM sessions WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        UNION ALL SELECT 'Evento' AS kind, title AS label FROM events WHERE campaign_id=$1 ${publicOnly ? "AND visibility='public'" : ''}
+       UNION ALL SELECT 'Grupo' AS kind, name AS label FROM groups WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
        ORDER BY kind, label`,
       [campaignId]
     ),
@@ -195,6 +208,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     notes: new Map(notes.rows.map(r => [r.id, r.title])),
     arcs: new Map(arcs.rows.map(r => [r.id, r.title])),
     sessions: new Map(sessions.rows.map(r => [r.id, r.title])),
+    groups: new Map(groups.rows.map(r => [r.id, r.name])),
   }
   const { rows: entityLinks } = await db.query(
     `SELECT source_type, source_id, target_type, target_id, relation_label
@@ -218,7 +232,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
   const eventLinks = eventIds.length
     ? await db.query(
       `SELECT l.event_id, l.entity_type, l.role,
-              COALESCE(ch.name, npc.name, loc.name, item.name, spell.name, creature.name, note.title, arc.title, session.title) AS entity_name
+              COALESCE(ch.name, npc.name, loc.name, item.name, spell.name, creature.name, note.title, arc.title, session.title, grp.name) AS entity_name
        FROM event_entity_links l
        LEFT JOIN characters ch ON l.entity_type='characters' AND ch.id=l.entity_id
        LEFT JOIN npcs npc ON l.entity_type='npcs' AND npc.id=l.entity_id
@@ -229,6 +243,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
        LEFT JOIN notes note ON l.entity_type='notes' AND note.id=l.entity_id
        LEFT JOIN arcs arc ON l.entity_type='arcs' AND arc.id=l.entity_id
        LEFT JOIN sessions session ON l.entity_type='sessions' AND session.id=l.entity_id
+       LEFT JOIN groups grp ON l.entity_type='groups' AND grp.id=l.entity_id
        WHERE l.event_id = ANY($1)
          AND (
            $2::boolean = false OR
@@ -242,6 +257,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
              WHEN 'notes' THEN COALESCE(note.visibility='public' AND note.is_secret=false, false)
              WHEN 'arcs' THEN COALESCE(arc.visibility='public', false)
              WHEN 'sessions' THEN COALESCE(session.visibility='public', false)
+             WHEN 'groups' THEN COALESCE(grp.visibility='public', false)
              ELSE false
            END
          )
@@ -313,6 +329,18 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       }
     ),
     '</chronicle>',
+    renderList(
+      '<groups>\nGrupos e organizacoes do mundo',
+      groups.rows,
+      r => {
+        const members = Number(r.member_count) > 0 ? ` | ${r.member_count} membro(s)` : ''
+        const hq = r.headquarters ? ` | Sede: ${compact(r.headquarters, 80)}` : ''
+        const motto = r.motto ? ` | Lema: "${compact(r.motto, 80)}"` : ''
+        const secrets = r.secrets ? ` | Segredos: ${compact(r.secrets, 160)}` : ''
+        return `- ${r.name}${r.type ? ` (${r.type})` : ''}${members}${hq}${motto}${r.description ? `: ${compact(r.description, 200)}` : ''}${secrets}`
+      }
+    ),
+    '</groups>',
     '<cast>',
     renderList('Personagens', characters.rows, r => {
       const profile = [r.race, r.class, r.level && `nivel ${r.level}`, r.is_alive === false ? 'morto' : null].filter(Boolean).join(' ')

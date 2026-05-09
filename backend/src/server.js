@@ -17,6 +17,7 @@ import { fiveEtoolsRoutes } from './routes/fiveEtools.js'
 import { aiRoutes }         from './routes/ai.js'
 import { chatRoutes }       from './routes/chat.js'
 import { eventRoutes }      from './routes/events.js'
+import { groupRoutes }      from './routes/groups.js'
 
 const fastify = Fastify({ logger: true })
 
@@ -37,6 +38,7 @@ fastify.register(fiveEtoolsRoutes)
 fastify.register(aiRoutes)
 fastify.register(chatRoutes)
 fastify.register(eventRoutes)
+fastify.register(groupRoutes)
 
 fastify.get('/health', async () => ({ status: 'ok' }))
 

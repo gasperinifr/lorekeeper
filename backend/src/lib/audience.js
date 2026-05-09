@@ -10,6 +10,7 @@ export const LINKABLE_TABLES = {
   sessions: { table: 'sessions', legacyVisibility: true },
   encounters: { table: 'encounters', legacyVisibility: true },
   events: { table: 'events', legacyVisibility: true },
+  groups: { table: 'groups' },
 }
 
 const PRIVATE_DATA_KEYS = new Set([

@@ -332,3 +332,42 @@ CREATE INDEX IF NOT EXISTS idx_events_arc         ON events(arc_id);
 CREATE INDEX IF NOT EXISTS idx_events_type_impact ON events(campaign_id, type, impact);
 CREATE INDEX IF NOT EXISTS idx_eel_event          ON event_entity_links(event_id);
 CREATE INDEX IF NOT EXISTS idx_eel_entity         ON event_entity_links(campaign_id, entity_type, entity_id);
+
+CREATE TABLE IF NOT EXISTS groups (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  shared_with_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  name         VARCHAR(255) NOT NULL,
+  type         VARCHAR(100),
+  description  TEXT,
+  headquarters TEXT,
+  motto        TEXT,
+  secrets      TEXT,
+  image_url    TEXT,
+  is_active    BOOLEAN DEFAULT true,
+  visibility   VARCHAR(20) DEFAULT 'public',
+  data         JSONB DEFAULT '{}',
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id     UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  campaign_id  UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  npc_id       UUID REFERENCES npcs(id) ON DELETE CASCADE,
+  character_id UUID REFERENCES characters(id) ON DELETE CASCADE,
+  role         VARCHAR(100),
+  is_secret    BOOLEAN DEFAULT false,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, npc_id),
+  UNIQUE(group_id, character_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_groups_campaign      ON groups(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_group  ON group_members(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_npc    ON group_members(campaign_id, npc_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_char   ON group_members(campaign_id, character_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_unique_npc ON group_members(group_id, npc_id) WHERE npc_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_unique_char ON group_members(group_id, character_id) WHERE character_id IS NOT NULL;

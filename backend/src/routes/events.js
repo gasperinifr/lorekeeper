@@ -8,7 +8,7 @@ const VALID_TYPES = [
 const VALID_IMPACTS = ['menor', 'significativo', 'divisor']
 const VALID_ENTITY_TYPES = [
   'characters', 'npcs', 'locations', 'items',
-  'spells', 'creatures', 'notes', 'arcs', 'sessions',
+  'spells', 'creatures', 'notes', 'groups', 'arcs', 'sessions',
 ]
 
 export async function eventRoutes(fastify) {

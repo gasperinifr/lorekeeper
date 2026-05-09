@@ -9,6 +9,7 @@ const SEARCHABLE = [
   { table: 'spells',     label: 'spells',     fields: ['name','description'], audience: true },
   { table: 'creatures',  label: 'creatures',  fields: ['name','description'], audience: true },
   { table: 'notes',      label: 'notes',      fields: ['title','content'], audience: true },
+  { table: 'groups',     label: 'groups',     fields: ['name','description','headquarters'], audience: true },
   { table: 'arcs',       label: 'arcs',       fields: ['title','summary'] },
   { table: 'sessions',   label: 'sessions',   fields: ['title','summary'] },
 ]
