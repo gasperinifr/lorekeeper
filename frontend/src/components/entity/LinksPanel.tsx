@@ -9,6 +9,15 @@ import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useAddEventLink, useEvents } from '@/hooks/useEvents'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
+import {
+  RELATION_TYPE_COLORS,
+  RELATION_TYPE_LABELS,
+  RELATION_TYPE_OPTIONS,
+  relationDetailText,
+  relationDisplayLabel,
+  relationTypeForDisplay,
+} from '@/config/relations'
+import { PropagationsPanel } from '@/components/entity/PropagationsPanel'
 import type { Arc, EntityEventLink, EntityLink, EntityType, LinkableType, RelationType, Session, Tag } from '@/types'
 import { clsx } from 'clsx'
 
@@ -22,6 +31,7 @@ interface Props {
   canEdit: boolean
   entityName?: string
   entityDescription?: string
+  entityData?: Record<string, unknown>
 }
 
 type LinkableOption = {
@@ -43,40 +53,15 @@ const RELATION_SUGGESTIONS = [
   'acontece em',
   'conhece',
   'possui',
+  'membro de',
+  'localizado em',
   'pertence a',
+  'parceria com',
   'protege',
   'ameaca',
   'investiga',
   'revela',
 ]
-
-const RELATION_TYPE_LABELS: Record<RelationType, string> = {
-  alianca: 'alianca',
-  rivalidade: 'rivalidade',
-  familia: 'familia',
-  lealdade: 'lealdade',
-  segredo: 'segredo',
-  divida: 'divida',
-  amor: 'amor',
-  odio: 'odio',
-  mentor: 'mentor',
-  neutro: 'neutro',
-  outro: 'outro',
-}
-
-export const RELATION_TYPE_COLORS: Record<RelationType, string> = {
-  alianca: 'text-emerald-400',
-  rivalidade: 'text-rose-400',
-  familia: 'text-sky-400',
-  lealdade: 'text-violet-400',
-  segredo: 'text-amber-400',
-  divida: 'text-orange-400',
-  amor: 'text-pink-400',
-  odio: 'text-red-500',
-  mentor: 'text-cyan-400',
-  neutro: 'text-parchment/50',
-  outro: 'text-parchment/40',
-}
 
 function getLinkableOption(type: LinkableType): LinkableOption | undefined {
   if (type in ENTITY_CONFIG) {
@@ -90,15 +75,17 @@ function isEntityType(type: LinkableType): type is EntityType {
   return type in ENTITY_CONFIG
 }
 
-export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit, entityName = '', entityDescription = '' }: Props) {
+export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit, entityName = '', entityDescription = '', entityData }: Props) {
   const [adding, setAdding] = useState(false)
   const [suggestedLinks, setSuggestedLinks] = useState<LinkSuggestion[]>([])
   const [suggestionError, setSuggestionError] = useState('')
+  const [formError, setFormError] = useState('')
   const initialLinkForm = {
     target_type: '' as LinkableType | '',
     target_id: '',
     relation_label: '',
-    relation_type: 'outro' as RelationType,
+    custom_relation: '',
+    relation_type: 'neutro' as RelationType,
   }
   const [form, setForm] = useState(initialLinkForm)
 
@@ -143,7 +130,15 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
     : []
 
   const submit = async () => {
+    setFormError('')
     if (!form.target_type || !form.target_id) return
+    if (form.target_type !== 'events' && form.relation_type === 'outro' && !form.custom_relation.trim()) {
+      setFormError('Informe qual é a relação personalizada.')
+      return
+    }
+    const relationLabel = form.relation_type === 'outro'
+      ? [form.custom_relation.trim(), form.relation_label.trim()].filter(Boolean).join(' - ')
+      : form.relation_label.trim()
     if (form.target_type === 'events') {
       await addEventLink.mutateAsync({
         entity_type: entityType,
@@ -159,11 +154,12 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
       source_id: entityId,
       target_type: form.target_type,
       target_id: form.target_id,
-      relation_label: form.relation_label || undefined,
+      relation_label: relationLabel || undefined,
       relation_type: form.relation_type,
     })
     setAdding(false)
     setForm(initialLinkForm)
+    setSuggestedLinks([])
   }
 
   const loadSuggestedLinks = async () => {
@@ -224,7 +220,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
   const title = entityType === 'sessions' ? 'Contexto da sessão' : 'Conexões'
 
   return (
-    <aside className="w-72 shrink-0 flex flex-col gap-6">
+    <aside className="w-[28rem] xl:w-[32rem] 2xl:w-[34rem] shrink-0 flex flex-col gap-6">
       {tags.length > 0 && (
         <div>
           <p className="text-xs text-parchment/30 uppercase tracking-widest mb-2">Tags</p>
@@ -235,18 +231,33 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
       )}
 
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <p className="text-xs text-parchment/30 uppercase tracking-widest flex items-center gap-1.5 min-w-0">
             <Link2 size={11} /> {title}
           </p>
           {canEdit && (
-            <button
-              onClick={() => setAdding(a => !a)}
-              className="text-parchment/30 hover:text-gold transition-colors"
-              title="Adicionar conexão"
-            >
-              <Plus size={14} />
-            </button>
+            <div className="relative flex items-center justify-end gap-2 shrink-0 mr-5">
+              {isEntityType(entityType) && (
+                <PropagationsPanel
+                  campaignId={campaignId}
+                  entityType={entityType}
+                  entityId={entityId}
+                  entityName={entityName}
+                  entityDescription={entityDescription}
+                  entityData={entityData}
+                  popover
+                />
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setAdding(a => !a)}
+                className="shrink-0 w-36"
+                title="Criar conexão"
+              >
+                <Plus size={13} /> {adding ? 'Fechar' : 'Criar conexão'}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -256,9 +267,9 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
               <Button
                 type="button"
                 size="sm"
-                variant="ghost"
                 onClick={loadSuggestedLinks}
                 loading={suggestLinks.isPending}
+                className="w-full"
               >
                 <Sparkles size={13} /> Conexões sugeridas
               </Button>
@@ -271,9 +282,11 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                     <div>
                       <p className="text-xs text-parchment">
                         {suggestion.target_name ?? suggestion.target_id}
-                        <span className="text-gold ml-2">{RELATION_TYPE_LABELS[suggestion.relation_type]}</span>
+                        <span className={clsx('ml-2', RELATION_TYPE_COLORS[suggestion.relation_type])}>
+                          {relationDisplayLabel(suggestion.relation_type, suggestion.relation_label)}
+                        </span>
                       </p>
-                      {suggestion.relation_label && (
+                      {suggestion.relation_label && suggestion.relation_type !== 'outro' && (
                         <p className="text-xs text-parchment/35 mt-0.5">{suggestion.relation_label}</p>
                       )}
                     </div>
@@ -328,28 +341,43 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
               </select>
             )}
 
+            {form.target_type !== 'events' && (
+              <select
+                value={form.relation_type}
+                onChange={e => setForm(f => ({ ...f, relation_type: e.target.value as RelationType, relation_label: '', custom_relation: '' }))}
+                className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 focus:outline-none"
+              >
+                {RELATION_TYPE_OPTIONS.map(relation => (
+                  <option key={relation} value={relation}>{RELATION_TYPE_LABELS[relation]}</option>
+                ))}
+              </select>
+            )}
+
+            {form.target_type !== 'events' && form.relation_type === 'outro' && (
+              <input
+                value={form.custom_relation}
+                onChange={e => setForm(f => ({ ...f, custom_relation: e.target.value }))}
+                placeholder="Especificar relação..."
+                className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 placeholder-parchment/30 focus:outline-none"
+              />
+            )}
+
             <input
-              list="relation-suggestions"
+              list={form.relation_type === 'outro' ? undefined : 'relation-suggestions'}
               value={form.relation_label}
               onChange={e => setForm(f => ({ ...f, relation_label: e.target.value }))}
-              placeholder="Observação da relação..."
+              placeholder={
+                form.target_type === 'events'
+                  ? 'Papel no evento...'
+                  : 'Detalhamento da relação...'
+              }
               className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 placeholder-parchment/30 focus:outline-none"
             />
             <datalist id="relation-suggestions">
               {RELATION_SUGGESTIONS.map(relation => <option key={relation} value={relation} />)}
             </datalist>
 
-            {form.target_type !== 'events' && (
-              <select
-                value={form.relation_type}
-                onChange={e => setForm(f => ({ ...f, relation_type: e.target.value as RelationType }))}
-                className="bg-stone-300 text-parchment text-xs rounded px-2 py-1.5 focus:outline-none"
-              >
-                {(Object.keys(RELATION_TYPE_LABELS) as RelationType[]).map(relation => (
-                  <option key={relation} value={relation}>{RELATION_TYPE_LABELS[relation]}</option>
-                ))}
-              </select>
-            )}
+            {formError && <p className="text-xs text-crimson-light">{formError}</p>}
 
             <div className="flex gap-2 mt-1">
               <Button size="sm" onClick={submit} loading={createLink.isPending} className="flex-1">Conectar</Button>
@@ -374,7 +402,9 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
             const Icon = meta.icon
             const item = findItem(type, id)
             const name = item ? displayName(type, item) : id
-            const relationType = link.relation_type ?? 'outro'
+            const relationType = relationTypeForDisplay(link.relation_type, link.relation_label)
+            const relationLabel = relationDisplayLabel(link.relation_type, link.relation_label)
+            const detailText = relationDetailText(link.relation_type, link.relation_label)
             return (
               <div key={link.id} className="flex items-center gap-2 group">
                 <Link
@@ -385,12 +415,12 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                   <div className="min-w-0">
                     <p className="text-xs text-parchment truncate flex items-center gap-1">
                       <span className={clsx('shrink-0 text-[10px] uppercase tracking-wide', RELATION_TYPE_COLORS[relationType])}>
-                        {RELATION_TYPE_LABELS[relationType]}
+                        {relationLabel}
                       </span>
                       {name}
                     </p>
                     <p className="text-xs text-parchment/30 truncate">
-                      {[meta.label, link.relation_label]
+                      {[meta.label, detailText]
                         .filter(Boolean)
                         .join(' - ')}
                     </p>

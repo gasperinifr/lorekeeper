@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ElementType } from 'react'
+import { useMemo, useRef, useState, type ElementType } from 'react'
 import { Check, MapPin, Package, Skull, Sparkles, User, X } from 'lucide-react'
 import { useApplyPropagation, useSuggestPropagations, type PropagationSuggestion } from '@/hooks/usePropagations'
+import { Button } from '@/components/ui/Button'
 import type { EntityType } from '@/types'
+import { clsx } from 'clsx'
 
 interface PropagationsPanelProps {
   campaignId: string
@@ -10,6 +12,8 @@ interface PropagationsPanelProps {
   entityName: string
   entityDescription?: string
   entityData?: Record<string, unknown>
+  popover?: boolean
+  className?: string
 }
 
 const TYPE_LABELS: Partial<Record<EntityType, string>> = {
@@ -51,6 +55,8 @@ export function PropagationsPanel({
   entityName,
   entityDescription,
   entityData,
+  popover = false,
+  className,
 }: PropagationsPanelProps) {
   const suggestPropagations = useSuggestPropagations(campaignId)
   const applyPropagation = useApplyPropagation(campaignId)
@@ -58,13 +64,16 @@ export function PropagationsPanel({
   const [suggestions, setSuggestions] = useState<PropagationSuggestion[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [applied, setApplied] = useState<Set<string>>(() => new Set())
-  const [recentlyApplied, setRecentlyApplied] = useState<Set<string>>(() => new Set())
-  const [closed, setClosed] = useState(false)
+  const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
+  const loadSuggestions = () => {
+    setOpen(true)
     if (requestedRef.current || !campaignId || !entityType || !entityId || !entityName) return
     requestedRef.current = true
+    setError('')
+    setLoaded(false)
     suggestPropagations.mutate(
       {
         entity_type: entityType,
@@ -78,17 +87,21 @@ export function PropagationsPanel({
           setSuggestions(result.propagations ?? [])
           setLoaded(true)
         },
-        onError: () => setLoaded(true),
+        onError: (err: any) => {
+          setError(err.message ?? 'Não foi possível buscar propagações agora.')
+          requestedRef.current = false
+          setLoaded(true)
+        },
       }
     )
-  }, [campaignId, entityData, entityDescription, entityId, entityName, entityType, suggestPropagations])
+  }
 
   const visibleSuggestions = useMemo(
     () => suggestions.filter(suggestion => {
       const key = suggestionKey(suggestion)
-      return !dismissed.has(key) && (!applied.has(key) || recentlyApplied.has(key))
+      return !dismissed.has(key) && !applied.has(key)
     }),
-    [applied, dismissed, recentlyApplied, suggestions]
+    [applied, dismissed, suggestions]
   )
 
   const ignoreSuggestion = (suggestion: PropagationSuggestion) => {
@@ -98,27 +111,35 @@ export function PropagationsPanel({
 
   const applySuggestion = async (suggestion: PropagationSuggestion) => {
     const key = suggestionKey(suggestion)
-    await applyPropagation.mutateAsync({
-      target_type: suggestion.target_type,
-      target_id: suggestion.target_id,
-      field: suggestion.field,
-      value: suggestion.value,
-    })
-    setApplied(current => new Set(current).add(key))
-    setRecentlyApplied(current => new Set(current).add(key))
-    window.setTimeout(() => {
-      setRecentlyApplied(current => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
+    setError('')
+    try {
+      await applyPropagation.mutateAsync({
+        target_type: suggestion.target_type,
+        target_id: suggestion.target_id,
+        field: suggestion.field,
+        value: suggestion.value,
       })
-    }, 1500)
+      setApplied(current => new Set(current).add(key))
+    } catch (err: any) {
+      setError(err.message ?? 'Não foi possível aplicar a propagação.')
+    }
   }
 
-  if (closed || !loaded || visibleSuggestions.length === 0) return null
+  const isEmpty = loaded && visibleSuggestions.length === 0
 
   return (
-    <div className="rounded-lg border border-gold/20 bg-gold/5 p-4 mb-4 transition-all">
+    <div className={clsx('relative', popover ? 'shrink-0' : 'mb-4', className)}>
+      <Button type="button" size="sm" onClick={loadSuggestions} loading={suggestPropagations.isPending}>
+        <Sparkles size={13} /> Propagações sugeridas pela IA
+      </Button>
+
+      {!open ? null : (
+    <div className={clsx(
+      'rounded-lg border border-gold/20 bg-stone-100 p-4 transition-all',
+      popover
+        ? 'absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(34rem,calc(100vw-2rem))] shadow-2xl'
+        : 'mt-3'
+    )}>
       <div className="text-xs font-medium text-gold/70 uppercase tracking-widest flex items-center justify-between mb-3">
         <span className="flex items-center gap-2">
           <Sparkles size={13} />
@@ -126,13 +147,27 @@ export function PropagationsPanel({
         </span>
         <button
           type="button"
-          onClick={() => setClosed(true)}
+          onClick={() => setOpen(false)}
           className="text-parchment/40 hover:text-parchment/70 transition-colors normal-case tracking-normal flex items-center gap-1"
         >
           <X size={13} />
           fechar
         </button>
       </div>
+
+      {!loaded && (
+        <p className="text-xs text-parchment/45">Buscando propagações...</p>
+      )}
+
+      {error && (
+        <p className="text-xs text-crimson-light bg-crimson/10 border border-crimson/20 rounded px-3 py-2 mb-3">
+          {error}
+        </p>
+      )}
+
+      {isEmpty && !error && (
+        <p className="text-xs text-parchment/45">Nenhuma propagação direta encontrada para esta entidade.</p>
+      )}
 
       <div>
         {visibleSuggestions.map(suggestion => {
@@ -191,6 +226,8 @@ export function PropagationsPanel({
           )
         })}
       </div>
+    </div>
+      )}
     </div>
   )
 }

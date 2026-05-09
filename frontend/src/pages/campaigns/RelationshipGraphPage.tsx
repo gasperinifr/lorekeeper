@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { BookMarked, Calendar, Crosshair, GitBranch, Link2, ZoomIn, ZoomOut } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
+import { RELATION_TYPE_HEX, relationDisplayLabel } from '@/config/relations'
 import { useEntityList } from '@/hooks/useEntities'
 import { useAllLinks } from '@/hooks/useLinks'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
@@ -41,23 +42,9 @@ type GraphEdge = {
   relation_type?: RelationType
 }
 
-const RELATION_TYPE_HEX: Record<RelationType, string> = {
-  alianca: '#34d399',
-  rivalidade: '#fb7185',
-  familia: '#38bdf8',
-  lealdade: '#a78bfa',
-  segredo: '#fbbf24',
-  divida: '#fb923c',
-  amor: '#f472b6',
-  odio: '#ef4444',
-  mentor: '#22d3ee',
-  neutro: '#c9c0aa',
-  outro: '#8f8777',
-}
-
 function edgeStyle(edge: GraphEdge) {
   return {
-    stroke: RELATION_TYPE_HEX[edge.relation_type ?? 'outro'],
+    stroke: edge.relation_type ? RELATION_TYPE_HEX[edge.relation_type] : '#8f8777',
     strokeWidth: 1.6,
     opacity: 0.62,
   }
@@ -461,7 +448,9 @@ export function RelationshipGraphPage() {
                   const tx = target.x ?? size.width / 2
                   const ty = target.y ?? size.height / 2
                   const style = edgeStyle(edge)
-                  const title = edge.label ? `${edge.label}${edge.relation_type ? ` (${edge.relation_type})` : ''}` : edge.relation_type
+                  const title = edge.label
+                    ? `${edge.label}${edge.relation_type ? ` (${relationDisplayLabel(edge.relation_type)})` : ''}`
+                    : edge.relation_type ? relationDisplayLabel(edge.relation_type) : undefined
                   return (
                     <g key={`${edge.id}-${version}`}>
                       <line

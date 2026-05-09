@@ -45,7 +45,7 @@ export function ArcDetailPage() {
   )
 
   return (
-    <div className="p-8 w-full max-w-[1400px] mx-auto">
+    <div className="p-8 w-full max-w-[1600px] mx-auto">
       <div className="flex gap-8 items-start">
         <div className="flex-1 min-w-0">
           <div className="mb-8">

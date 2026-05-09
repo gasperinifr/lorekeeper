@@ -5,7 +5,6 @@ import { useEntityDetail, useDeleteEntity } from '@/hooks/useEntities'
 import { useCreateLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { LinksPanel } from '@/components/entity/LinksPanel'
-import { PropagationsPanel } from '@/components/entity/PropagationsPanel'
 import { GroupMembersSection } from '@/components/entity/GroupMembersSection'
 import { CreatureStatBlock } from '@/components/entity/CreatureStatBlock'
 import { SpellStatBlock } from '@/components/entity/SpellStatBlock'
@@ -13,23 +12,11 @@ import { ItemStatBlock } from '@/components/entity/ItemStatBlock'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/AuthContext'
+import { RELATION_TYPE_COLORS, relationDisplayLabel, relationTypeForDisplay } from '@/config/relations'
 import type { EntityType, Group } from '@/types'
 import type { LinkSuggestion } from '@/hooks/useSuggestLinks'
 import type { FieldDef } from '@/config/entityConfig'
-
-const RELATION_LABELS: Record<string, string> = {
-  alianca: 'alianca',
-  rivalidade: 'rivalidade',
-  familia: 'familia',
-  lealdade: 'lealdade',
-  segredo: 'segredo',
-  divida: 'divida',
-  amor: 'amor',
-  odio: 'odio',
-  mentor: 'mentor',
-  neutro: 'neutro',
-  outro: 'outro',
-}
+import { clsx } from 'clsx'
 
 // Renderiza markdown simples (quebras de linha → <br>)
 function looksLikeHtml(value: string) {
@@ -168,7 +155,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
   const groupEntity = isGroup ? entity as unknown as Group : null
 
   return (
-    <div className="p-8 w-full max-w-[1400px] mx-auto">
+    <div className="p-8 w-full max-w-[1600px] mx-auto">
       {suggestions.length > 0 && (
         <div className="fixed right-6 top-6 z-40 w-80 rounded-lg border border-gold/25 bg-stone-100 shadow-xl p-4 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
@@ -193,9 +180,11 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
                 <div>
                   <p className="text-xs text-parchment">
                     {suggestion.target_name ?? 'Sugestao invalida'}
-                    <span className="text-gold ml-2">{RELATION_LABELS[suggestion.relation_type] ?? suggestion.relation_type}</span>
+                    <span className={clsx('ml-2', RELATION_TYPE_COLORS[relationTypeForDisplay(suggestion.relation_type, suggestion.relation_label)])}>
+                      {relationDisplayLabel(suggestion.relation_type, suggestion.relation_label)}
+                    </span>
                   </p>
-                  {suggestion.relation_label && (
+                  {suggestion.relation_label && suggestion.relation_type !== 'outro' && (
                     <p className="text-xs text-parchment/35 mt-0.5">{suggestion.relation_label}</p>
                   )}
                 </div>
@@ -263,17 +252,6 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
             <p className="text-xs text-crimson-light bg-crimson/10 border border-crimson/20 rounded px-3 py-2 mb-4">
               {deleteError}
             </p>
-          )}
-
-          {entity && (
-            <PropagationsPanel
-              campaignId={campaignId!}
-              entityType={entityType!}
-              entityId={entityId!}
-              entityName={entity.name ?? entity.title ?? ''}
-              entityDescription={entity.description ?? entity.content ?? ''}
-              entityData={entity.data}
-            />
           )}
 
           {imageUrl && !hasStructuredBlock && (
@@ -399,6 +377,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
           canEdit={!!canEdit}
           entityName={entity.name ?? entity.title ?? ''}
           entityDescription={entity.description ?? entity.content ?? ''}
+          entityData={entity.data}
         />
       </div>
     </div>

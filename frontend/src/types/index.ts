@@ -70,7 +70,9 @@ export interface Session {
 
 export type RelationType =
   | 'alianca' | 'rivalidade' | 'familia' | 'lealdade' | 'segredo'
-  | 'divida' | 'amor' | 'odio' | 'mentor' | 'neutro' | 'outro'
+  | 'divida' | 'amor' | 'amizade' | 'parceria' | 'posse'
+  | 'membro' | 'localizacao' | 'protecao' | 'subordinacao'
+  | 'mentor' | 'neutro' | 'outro' | 'odio'
 
 export interface EntityLink {
   id: string

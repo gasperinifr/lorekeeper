@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { EntityType } from '@/types'
 
@@ -30,6 +30,7 @@ export function useSuggestPropagations(campaignId: string) {
 }
 
 export function useApplyPropagation(campaignId: string) {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: {
       target_type: string
@@ -37,5 +38,9 @@ export function useApplyPropagation(campaignId: string) {
       field: string
       value: unknown
     }) => api.post<{ ok: boolean }>(`/campaigns/${campaignId}/ai/apply-propagation`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['entity', campaignId] })
+      qc.invalidateQueries({ queryKey: ['entities', campaignId] })
+    },
   })
 }

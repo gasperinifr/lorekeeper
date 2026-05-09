@@ -2,7 +2,10 @@ import { requireCampaignAccess, requireEditor } from '../middleware/authenticate
 import { filterVisibleLinks } from '../lib/audience.js'
 
 const VALID = ['characters','npcs','locations','items','spells','creatures','notes','sessions','arcs','encounters','events','groups']
-const RELATION_TYPES = ['alianca','rivalidade','familia','lealdade','segredo','divida','amor','odio','mentor','neutro','outro']
+const RELATION_TYPES = [
+  'alianca','rivalidade','familia','lealdade','segredo','divida','amor','amizade',
+  'parceria','posse','membro','localizacao','protecao','subordinacao','mentor','neutro','outro',
+]
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const LINK_TABLES = {
   characters: 'characters',
@@ -20,10 +23,34 @@ const LINK_TABLES = {
 }
 
 function normalizeLinkBody(body) {
+  const relationText = `${body.relation_type ?? ''} ${body.relation_label ?? ''}`.toLowerCase()
+  const relationType = normalizeRelationType(body.relation_type, relationText)
   return {
-    relation_type: RELATION_TYPES.includes(body.relation_type) ? body.relation_type : 'outro',
+    relation_type: relationType,
     relation_label: body.relation_label ? String(body.relation_label).slice(0, 100) : null,
   }
+}
+
+function normalizeRelationType(rawType, relationText = '') {
+  const raw = String(rawType ?? '').trim().toLowerCase()
+  if (raw === 'odio' || raw === 'ódio') return 'rivalidade'
+  if (RELATION_TYPES.includes(raw) && raw !== 'outro') return raw
+  if (/(rival|inimig|conflit|ódio|odio|hostil)/i.test(relationText)) return 'rivalidade'
+  if (/(alian|aliad|pacto)/i.test(relationText)) return 'alianca'
+  if (/(amiz|amig)/i.test(relationText)) return 'amizade'
+  if (/(parce|socied|colabora)/i.test(relationText)) return 'parceria'
+  if (/(fam[ií]l|irm[aã]o|irmã|pai|m[ãa]e|filh|parent)/i.test(relationText)) return 'familia'
+  if (/(leal|jurament|fidel)/i.test(relationText)) return 'lealdade'
+  if (/(segred|ocult|escond)/i.test(relationText)) return 'segredo'
+  if (/(d[ií]vid|deve|credor)/i.test(relationText)) return 'divida'
+  if (/(amor|romanc|paix|amante)/i.test(relationText)) return 'amor'
+  if (/(mentor|tutor|mestre|aprendiz)/i.test(relationText)) return 'mentor'
+  if (/(possu|dono|portador|pertence|propriet)/i.test(relationText)) return 'posse'
+  if (/(membro|integrante|filiad|pertence a|fac[cç][aã]o|grupo)/i.test(relationText)) return 'membro'
+  if (/(localiz|fica em|vive em|mora em|acontece em|aparece em|sediad)/i.test(relationText)) return 'localizacao'
+  if (/(prote[çc]|guard|defend)/i.test(relationText)) return 'protecao'
+  if (/(subordin|comanda|lidera|servo|vassal|chefe)/i.test(relationText)) return 'subordinacao'
+  return RELATION_TYPES.includes(raw) ? raw : 'outro'
 }
 
 export async function linkRoutes(fastify) {

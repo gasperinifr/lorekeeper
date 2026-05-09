@@ -4,7 +4,10 @@ import { canViewDm } from '../lib/audience.js'
 
 export async function aiRoutes(fastify) {
   const { db } = fastify
-  const LINK_RELATION_TYPES = ['alianca','rivalidade','familia','lealdade','segredo','divida','amor','odio','mentor','neutro','outro']
+  const LINK_RELATION_TYPES = [
+    'alianca','rivalidade','familia','lealdade','segredo','divida','amor','amizade',
+    'parceria','posse','membro','localizacao','protecao','subordinacao','mentor','neutro','outro',
+  ]
   const LINK_TYPE_ALIASES = {
     character: 'characters',
     characters: 'characters',
@@ -60,6 +63,12 @@ REGRAS OBRIGATORIAS:
     }
     if (/api key|unauthorized|authentication/i.test(message)) {
       return 'Falha ao autenticar na Groq. Verifique GROQ_API_KEY no Fly.'
+    }
+    if (/rate limit|tokens per day|429/i.test(message)) {
+      const retry = message.match(/try again in ([^".]+)/i)?.[1]
+      return retry
+        ? `Limite diário da IA atingido. Tente novamente em ${retry}.`
+        : 'Limite diário da IA atingido. Tente novamente mais tarde.'
     }
     if (/model/i.test(message)) {
       return `Falha ao gerar com IA: modelo da Groq inválido ou indisponível (${message}).`
@@ -271,8 +280,9 @@ ${entityList}
 
 Identifique até 3 conexões que fazem sentido narrativo entre a nova entidade e as existentes.
 Retorne JSON:
-{"suggestions":[{"target_id":"uuid-sem-prefixo","target_type":"characters|npcs|locations|items|groups","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|odio|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
+{"suggestions":[{"target_id":"uuid-sem-prefixo","target_type":"characters|npcs|locations|items|groups","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|amizade|parceria|posse|membro|localizacao|protecao|subordinacao|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
 Use exatamente um dos ids listados. Nao invente ids, nao use nomes como id e nao inclua prefixos como "npcs/" dentro de target_id.
+Use "outro" apenas quando nenhum tipo existente representar a relacao. Use "rivalidade" para inimizade, odio ou hostilidade.
 Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
         600
       )
@@ -289,7 +299,7 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
           const { targetType, targetId } = normalizeSuggestedTarget(s)
           const target = allEntities.find(e => e.id === targetId && e.type === targetType)
           if (!target) return null
-          const relationType = LINK_RELATION_TYPES.includes(s.relation_type) ? s.relation_type : 'outro'
+          const relationType = normalizeRelationType(s.relation_type, s.relation_label)
           return {
             target_id: target.id,
             target_type: target.type,
@@ -489,6 +499,29 @@ Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
       targetId = typedId[2].trim()
     }
     return { targetType, targetId }
+  }
+
+  function normalizeRelationType(rawType, relationLabel = '') {
+    const raw = String(rawType ?? '').trim().toLowerCase()
+    const relationText = `${raw} ${relationLabel ?? ''}`.toLowerCase()
+    if (raw === 'odio' || raw === 'ódio') return 'rivalidade'
+    if (LINK_RELATION_TYPES.includes(raw) && raw !== 'outro') return raw
+    if (/(rival|inimig|conflit|ódio|odio|hostil)/i.test(relationText)) return 'rivalidade'
+    if (/(alian|aliad|pacto)/i.test(relationText)) return 'alianca'
+    if (/(amiz|amig)/i.test(relationText)) return 'amizade'
+    if (/(parce|socied|colabora)/i.test(relationText)) return 'parceria'
+    if (/(fam[ií]l|irm[aã]o|irmã|pai|m[ãa]e|filh|parent)/i.test(relationText)) return 'familia'
+    if (/(leal|jurament|fidel)/i.test(relationText)) return 'lealdade'
+    if (/(segred|ocult|escond)/i.test(relationText)) return 'segredo'
+    if (/(d[ií]vid|deve|credor)/i.test(relationText)) return 'divida'
+    if (/(amor|romanc|paix|amante)/i.test(relationText)) return 'amor'
+    if (/(mentor|tutor|mestre|aprendiz)/i.test(relationText)) return 'mentor'
+    if (/(possu|dono|portador|pertence|propriet)/i.test(relationText)) return 'posse'
+    if (/(membro|integrante|filiad|pertence a|fac[cç][aã]o|grupo)/i.test(relationText)) return 'membro'
+    if (/(localiz|fica em|vive em|mora em|acontece em|aparece em|sediad)/i.test(relationText)) return 'localizacao'
+    if (/(prote[çc]|guard|defend)/i.test(relationText)) return 'protecao'
+    if (/(subordin|comanda|lidera|servo|vassal|chefe)/i.test(relationText)) return 'subordinacao'
+    return LINK_RELATION_TYPES.includes(raw) ? raw : 'outro'
   }
 
   function oracleSystemPrompt(context, mode) {
