@@ -8,6 +8,8 @@ import { useCampaign } from '@/hooks/useCampaign'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LocationGenerator } from '@/components/ai/LocationGenerator'
+import { EntityListItem } from '@/components/entity/EntityListItem'
+import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { clsx } from 'clsx'
 
 interface LocationNode {
@@ -309,17 +311,12 @@ export function LocationsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-stone-100 border border-stone-300 hover:border-emerald-400/30 rounded-xl px-5 py-4 transition-colors group">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Map size={14} className="text-emerald-400" />
-                      <p className="text-sm font-medium text-parchment group-hover:text-gold transition-colors truncate">
-                        {loc.name}
-                        {loc.visibility === 'private' && <Lock size={12} className="inline ml-2 text-parchment/30" />}
-                      </p>
-                    </div>
-                    {loc.type && <p className="text-xs text-parchment/40 ml-6">{loc.type}</p>}
-                    {loc.parent_id && <p className="text-xs text-emerald-400/40 ml-6 mt-1">sub-local</p>}
-                  </div>
+                  <EntityListItem
+                    entity={loc}
+                    config={ENTITY_CONFIG.locations}
+                    meta={loc.parent_id ? 'Sub-local' : 'Local'}
+                    subtitle={loc.type}
+                  />
                 )}
               </Link>
             ))}

@@ -5,13 +5,14 @@ import { useEntityDetail, useDeleteEntity } from '@/hooks/useEntities'
 import { useCreateLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { LinksPanel } from '@/components/entity/LinksPanel'
+import { GroupMembersSection } from '@/components/entity/GroupMembersSection'
 import { CreatureStatBlock } from '@/components/entity/CreatureStatBlock'
 import { SpellStatBlock } from '@/components/entity/SpellStatBlock'
 import { ItemStatBlock } from '@/components/entity/ItemStatBlock'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/AuthContext'
-import type { EntityType } from '@/types'
+import type { EntityType, Group } from '@/types'
 import type { LinkSuggestion } from '@/hooks/useSuggestLinks'
 import type { FieldDef } from '@/config/entityConfig'
 
@@ -90,6 +91,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
   const location = useLocation()
   const { user } = useAuth()
   const [deleteError, setDeleteError] = useState('')
+  const [suggestionError, setSuggestionError] = useState('')
   const [suggestions, setSuggestions] = useState<LinkSuggestion[]>(
     () => (location.state as { linkSuggestions?: LinkSuggestion[] } | null)?.linkSuggestions ?? []
   )
@@ -114,15 +116,20 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
   }
 
   const connectSuggestion = async (suggestion: LinkSuggestion) => {
-    await createLink.mutateAsync({
-      source_type: entityType!,
-      source_id: entityId!,
-      target_type: suggestion.target_type,
-      target_id: suggestion.target_id,
-      relation_type: suggestion.relation_type,
-      relation_label: suggestion.relation_label,
-    })
-    setSuggestions(current => current.filter(item => item !== suggestion))
+    setSuggestionError('')
+    try {
+      await createLink.mutateAsync({
+        source_type: entityType!,
+        source_id: entityId!,
+        target_type: suggestion.target_type,
+        target_id: suggestion.target_id,
+        relation_type: suggestion.relation_type,
+        relation_label: suggestion.relation_label,
+      })
+      setSuggestions(current => current.filter(item => item !== suggestion))
+    } catch (err: any) {
+      setSuggestionError(err.message ?? 'Nao foi possivel criar a conexao.')
+    }
   }
 
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
@@ -156,6 +163,8 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
     .filter(section => section.fields.length > 0)
   const imageUrl = entity.image_url ?? entity.portrait_url
   const imageKey = entity.image_url ? 'image_url' : entity.portrait_url ? 'portrait_url' : null
+  const isGroup = entityType === 'groups'
+  const groupEntity = isGroup ? entity as unknown as Group : null
 
   return (
     <div className="p-8 w-full max-w-[1400px] mx-auto">
@@ -182,7 +191,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
               <div key={`${suggestion.target_type}-${suggestion.target_id}`} className="rounded border border-stone-300 bg-stone-200 p-3 flex flex-col gap-2">
                 <div>
                   <p className="text-xs text-parchment">
-                    {suggestion.target_name ?? suggestion.target_id}
+                    {suggestion.target_name ?? 'Sugestao invalida'}
                     <span className="text-gold ml-2">{RELATION_LABELS[suggestion.relation_type] ?? suggestion.relation_type}</span>
                   </p>
                   {suggestion.relation_label && (
@@ -195,6 +204,7 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
                     onClick={() => connectSuggestion(suggestion)}
                     loading={createLink.isPending}
                     className="flex-1"
+                    disabled={!suggestion.target_name}
                   >
                     Conectar
                   </Button>
@@ -209,6 +219,9 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
               </div>
             ))}
           </div>
+          {suggestionError && (
+            <p className="text-xs text-crimson-light">{suggestionError}</p>
+          )}
         </div>
       )}
 
@@ -349,6 +362,14 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
                 <h3 className="text-xs text-parchment/30 uppercase tracking-widest mb-2">Como encontrar</h3>
                 <Prose text={entity.data.hook} />
               </div>
+            )}
+
+            {isGroup && groupEntity && (
+              <GroupMembersSection
+                campaignId={campaignId!}
+                group={groupEntity}
+                canEdit={!!canEdit}
+              />
             )}
           </div>
         </div>

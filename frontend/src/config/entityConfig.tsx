@@ -113,7 +113,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.data?.player_name ? `Jogador: ${e.data.player_name}` : null, e.race, e.class, e.level ? `Nível ${e.level}` : null, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' · '),
+    displaySub: e => [e.data?.player_name ? `Jogador: ${e.data.player_name}` : null, e.race, e.class, e.level ? `Nível ${e.level}` : null, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' - '),
   },
 
   npcs: {
@@ -159,7 +159,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.role, e.race, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' · '),
+    displaySub: e => [e.role, e.race, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' - '),
     secretField: 'secrets',
   },
 
@@ -243,7 +243,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.rarity, e.type].filter(Boolean).join(' · '),
+    displaySub: e => [e.rarity, e.type].filter(Boolean).join(' - '),
   },
 
   spells: {
@@ -263,7 +263,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       { key: 'description', label: 'Descrição', type: 'textarea', rows: 5 },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.level === 0 ? 'Truque' : e.level !== undefined && e.level !== null ? `Nível ${e.level}` : null, e.school].filter(Boolean).join(' · '),
+    displaySub: e => [e.level === 0 ? 'Truque' : e.level !== undefined && e.level !== null ? `Nível ${e.level}` : null, e.school].filter(Boolean).join(' - '),
   },
 
   creatures: {
@@ -299,7 +299,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.type, e.cr ? `CR ${e.cr}` : null].filter(Boolean).join(' · '),
+    displaySub: e => [e.type, e.cr ? `CR ${e.cr}` : null].filter(Boolean).join(' - '),
   },
 
   notes: {
@@ -314,6 +314,34 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
     ],
     displayName: e => e.title,
     displaySub: e => e.is_secret ? 'Secreto' : '',
+  },
+
+  groups: {
+    label: 'Grupo', labelPlural: 'Grupos',
+    icon: Users, accentClass: 'text-amber-400',
+    fields: [
+      { key: 'name', label: 'Nome', type: 'text', required: true },
+      { key: 'type', label: 'Tipo', type: 'text', placeholder: 'Guilda, culto, regimento, familia...' },
+      { key: 'image_url', label: 'Imagem / Icone', type: 'text' },
+      VISIBILITY_FIELD,
+      { key: 'description', label: 'Descrição', type: 'textarea', rows: 4 },
+      { key: 'headquarters', label: 'Sede / Local de atuacao', type: 'text' },
+      { key: 'motto', label: 'Lema', type: 'textarea', rows: 2 },
+      { key: 'is_active', label: 'Ativo', type: 'toggle' },
+    ],
+    sections: [
+      {
+        key: 'secrets',
+        label: 'Segredos & DM',
+        defaultCollapsed: true,
+        fields: [
+          { key: 'secrets', label: 'Segredos (DM)', type: 'textarea', rows: 3, hint: 'Visivel apenas ao mestre.' },
+        ],
+      },
+    ],
+    displayName: e => e.name,
+    displaySub: e => [e.type, e.headquarters].filter(Boolean).join(' - '),
+    secretField: 'secrets',
   },
 }
 

@@ -110,6 +110,7 @@ export function OraclePage() {
   const spells = useEntityList(campaignId!, 'spells')
   const creatures = useEntityList(campaignId!, 'creatures')
   const notes = useEntityList(campaignId!, 'notes')
+  const groups = useEntityList(campaignId!, 'groups')
   const arcs = useArcs(campaignId!)
   const sessions = useCampaignSessions(campaignId!)
   const events = useEvents(campaignId!)
@@ -134,6 +135,7 @@ export function OraclePage() {
       spells: spells.data ?? [],
       creatures: creatures.data ?? [],
       notes: notes.data ?? [],
+      groups: groups.data ?? [],
     }
 
     const entityCitations = ENTITY_TYPES.flatMap(type =>
@@ -156,6 +158,7 @@ export function OraclePage() {
     characters.data,
     creatures.data,
     events.data,
+    groups.data,
     items.data,
     locations.data,
     notes.data,

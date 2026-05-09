@@ -4,6 +4,7 @@ import { AtSign, Image as ImageIcon, MessageSquare, Send, Trash2, X } from 'luci
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
 import { useEntityList } from '@/hooks/useEntities'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
+import { useGroups } from '@/hooks/useGroups'
 import { useCampaign } from '@/hooks/useCampaign'
 import { useAuth } from '@/contexts/AuthContext'
 import { useChatMessages, useCreateChatMessage, useDeleteChatMessage } from '@/hooks/useChat'
@@ -53,6 +54,7 @@ export function TavernaPage() {
   const spells = useEntityList(campaignId!, 'spells')
   const creatures = useEntityList(campaignId!, 'creatures')
   const notes = useEntityList(campaignId!, 'notes')
+  const groups = useGroups(campaignId!)
   const arcs = useArcs(campaignId!)
   const sessions = useCampaignSessions(campaignId!)
 
@@ -73,6 +75,7 @@ export function TavernaPage() {
     spells: spells.data ?? [],
     creatures: creatures.data ?? [],
     notes: notes.data ?? [],
+    groups: groups.data ?? [],
     arcs: arcs.data ?? [],
     sessions: sessions.data ?? [],
   }
@@ -99,7 +102,7 @@ export function TavernaPage() {
       path: pathFor(type, item),
       typeLabel: linkableLabel(type),
     })))
-  }, [characters.data, npcs.data, locations.data, items.data, spells.data, creatures.data, notes.data, arcs.data, sessions.data])
+  }, [characters.data, npcs.data, locations.data, items.data, spells.data, creatures.data, notes.data, groups.data, arcs.data, sessions.data])
 
   const filteredMentions = mentionItems
     .filter(item => item.label.toLowerCase().includes(mentionFilter.toLowerCase()) || item.typeLabel.toLowerCase().includes(mentionFilter.toLowerCase()))

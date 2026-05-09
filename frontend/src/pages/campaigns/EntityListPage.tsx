@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { FiveEBrowser } from '@/components/fiveEtools/FiveEBrowser'
 import { NPCGenerator } from '@/components/ai/NPCGenerator'
 import { EntityAIGenerator } from '@/components/ai/EntityAIGenerator'
+import { EntityListItem } from '@/components/entity/EntityListItem'
 import type { EntityType } from '@/types'
 import { clsx } from 'clsx'
 
@@ -234,30 +235,14 @@ export function EntityListPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-stone-100 border border-stone-300 hover:border-gold/30 rounded-lg px-5 py-4 transition-colors group flex items-start gap-3">
-                <div className={clsx('mt-0.5 shrink-0', cfg.accentClass)}>
-                  <cfg.icon size={16} />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-parchment text-sm group-hover:text-gold transition-colors truncate">
-                    {cfg.displayName(entity)}
-                    {entity.visibility === 'private' && <Lock size={12} className="inline ml-2 text-parchment/30" />}
-                  </p>
-
-                  <p className="text-xs text-parchment/40 mt-0.5 truncate">
-                    {cfg.displaySub(entity)}
-                  </p>
-
-                  {entity.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {entity.tags.map((t: any) => (
-                        <TagBadge key={t.id} tag={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <EntityListItem
+                entity={entity}
+                config={cfg}
+                meta={cfg.label}
+                tags={entity.tags?.length > 0
+                  ? entity.tags.map((t: any) => <TagBadge key={t.id} tag={t} />)
+                  : undefined}
+              />
             )}
           </Link>
         ))}

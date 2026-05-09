@@ -108,6 +108,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
   const spells = useEntityList(campaignId, 'spells')
   const creatures = useEntityList(campaignId, 'creatures')
   const notes = useEntityList(campaignId, 'notes')
+  const groups = useEntityList(campaignId, 'groups')
   const arcs = useArcs(campaignId)
   const sessions = useCampaignSessions(campaignId)
   const events = useEvents(campaignId)
@@ -120,6 +121,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
     spells: spells.data ?? [],
     creatures: creatures.data ?? [],
     notes: notes.data ?? [],
+    groups: groups.data ?? [],
     arcs: arcs.data ?? [],
     sessions: sessions.data ?? [],
     events: events.data ?? [],

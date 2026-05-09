@@ -7,6 +7,7 @@ import { useEntityList } from '@/hooks/useEntities'
 import { useAllLinks } from '@/hooks/useLinks'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
 import { useEvents } from '@/hooks/useEvents'
+import { useGroups } from '@/hooks/useGroups'
 import type { EntityLink, EntityType, LinkableType, RelationType } from '@/types'
 
 declare global {
@@ -149,13 +150,14 @@ export function RelationshipGraphPage() {
   const spells = useEntityList(campaignId!, 'spells')
   const creatures = useEntityList(campaignId!, 'creatures')
   const notes = useEntityList(campaignId!, 'notes')
+  const groups = useGroups(campaignId!)
   const arcs = useArcs(campaignId!)
   const sessions = useCampaignSessions(campaignId!)
   const events = useEvents(campaignId!)
   const links = useAllLinks(campaignId!)
 
   const isLoading = [
-    characters, npcs, locations, items, spells, creatures, notes, arcs, sessions, events, links,
+    characters, npcs, locations, items, spells, creatures, notes, groups, arcs, sessions, events, links,
   ].some(query => query.isLoading)
 
   const { nodes, edges } = useMemo(() => {
@@ -169,6 +171,7 @@ export function RelationshipGraphPage() {
       spells: spells.data ?? [],
       creatures: creatures.data ?? [],
       notes: notes.data ?? [],
+      groups: groups.data ?? [],
       arcs: arcs.data ?? [],
       sessions: sessions.data ?? [],
       events: events.data ?? [],
@@ -255,6 +258,7 @@ export function RelationshipGraphPage() {
     spells.data,
     creatures.data,
     notes.data,
+    groups.data,
     arcs.data,
     sessions.data,
     events.data,

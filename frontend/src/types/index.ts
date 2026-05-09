@@ -134,7 +134,7 @@ export interface WorldEntity {
   visibility?: 'public' | 'private'
 }
 
-export type EntityType = 'characters' | 'npcs' | 'locations' | 'items' | 'spells' | 'creatures' | 'notes'
+export type EntityType = 'characters' | 'npcs' | 'locations' | 'items' | 'spells' | 'creatures' | 'notes' | 'groups'
 export type LinkableType = EntityType | 'arcs' | 'sessions' | 'encounters' | 'events'
 
 export type EventType =
@@ -188,4 +188,47 @@ export interface PropagationConsequence {
   field: string
   value: unknown
   label?: string
+}
+
+export interface GroupMember {
+  id: string
+  group_id: string
+  campaign_id: string
+  npc_id?: string | null
+  character_id?: string | null
+  role?: string | null
+  is_secret: boolean
+  npc_name?: string
+  npc_role?: string
+  npc_portrait?: string
+  npc_is_alive?: boolean
+  char_name?: string
+  char_class?: string
+  char_portrait?: string
+  created_at: string
+}
+
+export interface Group {
+  id: string
+  campaign_id: string
+  created_by?: string | null
+  shared_with_user_id?: string | null
+  name: string
+  type?: string | null
+  description?: string | null
+  headquarters?: string | null
+  motto?: string | null
+  secrets?: string | null
+  image_url?: string | null
+  is_active: boolean
+  visibility: 'public' | 'private' | 'gm' | 'user'
+  data?: Record<string, unknown>
+  members: GroupMember[]
+  links?: EntityLink[]
+  _role?: string
+  _play_role?: string
+  _can_view_dm?: boolean
+  created_by_username?: string
+  created_at: string
+  updated_at: string
 }

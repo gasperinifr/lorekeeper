@@ -269,6 +269,7 @@ function PendingConnectionsEditor({ campaignId, value, onChange }: {
   const spells = useEntityList(campaignId, 'spells')
   const creatures = useEntityList(campaignId, 'creatures')
   const notes = useEntityList(campaignId, 'notes')
+  const groups = useEntityList(campaignId, 'groups')
   const arcs = useArcs(campaignId)
   const sessions = useCampaignSessions(campaignId)
 
@@ -280,6 +281,7 @@ function PendingConnectionsEditor({ campaignId, value, onChange }: {
     spells: spells.data ?? [],
     creatures: creatures.data ?? [],
     notes: notes.data ?? [],
+    groups: groups.data ?? [],
     arcs: arcs.data ?? [],
     sessions: sessions.data ?? [],
   }

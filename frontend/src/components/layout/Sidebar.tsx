@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/Input'
 const WORLD_SECTIONS = [
   { label: 'Personagens', icon: Users, path: 'characters' },
   { label: 'NPCs', icon: Skull, path: 'npcs' },
+  { label: 'Grupos', icon: Network, path: 'groups' },
   { label: 'Locais', icon: Map, path: 'locations' },
   { label: 'Itens', icon: Sword, path: 'items' },
   { label: 'Magias', icon: BookOpen, path: 'spells' },
@@ -35,7 +36,7 @@ function NavItem({ to, icon: Icon, label, exact = false }: { to: string; icon: E
     <Link
       to={to}
       className={clsx(
-        'flex items-center gap-3 px-3 py-2 rounded text-sm transition-colors',
+        'flex items-center gap-2.5 px-3 py-1.5 rounded text-sm transition-colors',
         active
           ? 'bg-gold/20 text-gold font-medium'
           : 'text-parchment/60 hover:text-parchment hover:bg-stone-200'
@@ -87,7 +88,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 flex flex-col gap-0.5 overflow-y-auto">
         {!campaignId && (
           <NavItem to="/dashboard" icon={Home} label="Campanhas" />
         )}
@@ -96,7 +97,7 @@ export function Sidebar() {
           <>
             <Link
               to="/dashboard"
-              className="flex items-center gap-2 text-xs text-parchment/40 hover:text-parchment/70 mb-3 transition-colors"
+              className="flex items-center gap-2 text-xs text-parchment/40 hover:text-parchment/70 mb-2 transition-colors"
             >
               <ChevronLeft size={14} /> Todas as campanhas
             </Link>
@@ -107,14 +108,14 @@ export function Sidebar() {
             <NavItem to={`/campaigns/${campaignId}/oracle`} icon={Sparkles} label="Oráculo" />
             <NavItem to={`/campaigns/${campaignId}/relationships`} icon={Network} label="Relações" />
 
-            <div className="mt-3 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
+            <div className="mt-2 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
               Mundo
             </div>
             {WORLD_SECTIONS.map(s => (
               <NavItem key={s.path} to={`/campaigns/${campaignId}/${s.path}`} icon={s.icon} label={s.label} />
             ))}
 
-            <div className="mt-4 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
+            <div className="mt-2 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
               Narrativa
             </div>
             {NARRATIVE_SECTIONS.map(s => (
@@ -123,7 +124,7 @@ export function Sidebar() {
 
             {canEdit && (
               <>
-                <div className="mt-4 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
+                <div className="mt-2 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
                   Campanha
                 </div>
                 <NavItem to={`/campaigns/${campaignId}/settings`} icon={Settings} label="Configurações" />

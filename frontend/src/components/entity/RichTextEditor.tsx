@@ -86,6 +86,7 @@ export function RichTextEditor({ campaignId, value, onChange }: Props) {
   const spells = useEntityList(campaignId, 'spells')
   const creatures = useEntityList(campaignId, 'creatures')
   const notes = useEntityList(campaignId, 'notes')
+  const groups = useEntityList(campaignId, 'groups')
 
   const mentions = useMemo(() => ENTITY_TYPES.flatMap(type => {
     const lists: Partial<Record<EntityType, any[]>> = {
@@ -96,6 +97,7 @@ export function RichTextEditor({ campaignId, value, onChange }: Props) {
       spells: spells.data ?? [],
       creatures: creatures.data ?? [],
       notes: notes.data ?? [],
+      groups: groups.data ?? [],
     }
     const cfg = ENTITY_CONFIG[type]
     return (lists[type] ?? []).map((entity: any): MentionOption => ({
@@ -115,6 +117,7 @@ export function RichTextEditor({ campaignId, value, onChange }: Props) {
     spells.data,
     creatures.data,
     notes.data,
+    groups.data,
   ])
 
   const filteredMentions = useMemo(() => {

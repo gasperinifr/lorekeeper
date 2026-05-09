@@ -509,6 +509,7 @@ export function ChroniclePage() {
   const spells = useEntityList(campaignId!, 'spells')
   const creatures = useEntityList(campaignId!, 'creatures')
   const notes = useEntityList(campaignId!, 'notes')
+  const groups = useEntityList(campaignId!, 'groups')
   const deleteEvent = useDeleteEvent(campaignId!)
 
   const state = location.state as { session_id?: string } | null
@@ -534,9 +535,10 @@ export function ChroniclePage() {
     spells: spells.data ?? [],
     creatures: creatures.data ?? [],
     notes: notes.data ?? [],
+    groups: groups.data ?? [],
     arcs: arcs ?? [],
     sessions: sessions ?? [],
-  }), [arcs, characters.data, creatures.data, items.data, locations.data, notes.data, npcs.data, sessions, spells.data])
+  }), [arcs, characters.data, creatures.data, groups.data, items.data, locations.data, notes.data, npcs.data, sessions, spells.data])
 
   const filteredEvents = (events ?? []).filter(event => {
     if (impactFilter !== 'all' && event.impact !== impactFilter) return false
