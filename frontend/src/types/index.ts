@@ -232,3 +232,27 @@ export interface Group {
   created_at: string
   updated_at: string
 }
+
+export type DiaryChannel = 'group' | 'private'
+
+export interface DiaryMessage {
+  id: string
+  campaign_id: string
+  author_id?: string | null
+  channel: DiaryChannel
+  player_id?: string | null
+  content: string
+  image_url?: string | null
+  mentions?: ChatMention[]
+  username?: string
+  avatar_url?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DiaryPlayer {
+  id: string
+  username: string
+  avatar_url?: string | null
+  play_role: string
+}

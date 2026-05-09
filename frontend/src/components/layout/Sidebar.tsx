@@ -5,7 +5,7 @@ import {
   BookOpen, Map, Users, Sword, Bug, Scroll,
   GitBranch, Calendar, Search, Settings, ChevronLeft,
   Skull, Home, LogOut, MessageSquare, Network, Sparkles,
-  BookMarked, Pencil, X,
+  BookMarked, NotebookPen, Pencil, X,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCampaign } from '@/hooks/useCampaign'
@@ -52,7 +52,7 @@ export function Sidebar() {
   const { campaignId } = useParams()
   const { user, logout, updateUsername } = useAuth()
   const { data: campaign } = useCampaign(campaignId ?? '')
-  const canEdit = ['admin', 'editor'].includes(campaign?.role ?? '')
+  const canAdmin = campaign?.role === 'admin'
   const [profileOpen, setProfileOpen] = useState(false)
   const [username, setUsername] = useState(user?.username ?? '')
   const [profileError, setProfileError] = useState('')
@@ -105,6 +105,7 @@ export function Sidebar() {
             <NavItem to={`/campaigns/${campaignId}`} icon={Home} label="Início" exact />
             <NavItem to={`/campaigns/${campaignId}/search`} icon={Search} label="Buscar" />
             <NavItem to={`/campaigns/${campaignId}/taverna`} icon={MessageSquare} label="Taverna" />
+            <NavItem to={`/campaigns/${campaignId}/diary`} icon={NotebookPen} label="Diário" />
             <NavItem to={`/campaigns/${campaignId}/oracle`} icon={Sparkles} label="Oráculo" />
             <NavItem to={`/campaigns/${campaignId}/relationships`} icon={Network} label="Relações" />
 
@@ -122,7 +123,7 @@ export function Sidebar() {
               <NavItem key={s.path} to={`/campaigns/${campaignId}/${s.path}`} icon={s.icon} label={s.label} />
             ))}
 
-            {canEdit && (
+            {canAdmin && (
               <>
                 <div className="mt-2 mb-1 px-3 text-xs font-medium text-parchment/30 uppercase tracking-widest">
                   Campanha
@@ -147,7 +148,7 @@ export function Sidebar() {
           <span className="text-sm text-parchment/70 flex-1 truncate group-hover:text-gold transition-colors">{user?.username}</span>
           <Pencil size={13} className="text-parchment/25 group-hover:text-gold transition-colors shrink-0" />
         </button>
-        {campaignId && canEdit && (
+        {campaignId && canAdmin && (
           <Link
             to={`/campaigns/${campaignId}/settings`}
             className="text-parchment/30 hover:text-gold transition-colors"

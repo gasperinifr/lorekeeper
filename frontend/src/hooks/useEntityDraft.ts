@@ -4,8 +4,9 @@ import type { EntityType } from '@/types'
 
 interface DraftParams {
   entity_type: EntityType
-  name: string
+  name?: string
   hint?: string
+  data?: Record<string, unknown>
 }
 
 export function useEntityDraft(campaignId: string) {

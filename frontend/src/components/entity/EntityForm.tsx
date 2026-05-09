@@ -1,6 +1,6 @@
 import { useMemo, useState, FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Calendar, GitBranch, Link2, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { Calendar, ChevronDown, GitBranch, Globe2, Link2, Lock, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { EntitySection } from '@/components/entity/EntitySection'
 import { useCreateEntity, useEntityList, useUpdateEntity } from '@/hooks/useEntities'
@@ -33,7 +33,19 @@ const visibilityLabels: Record<string, string> = {
 }
 
 const serializeForm = (value: unknown) => JSON.stringify(value ?? null)
-const DRAFT_TYPES: EntityType[] = ['npcs', 'locations', 'creatures', 'items', 'spells']
+const FIELD_VISIBILITY_KEY = '_field_visibility'
+const DRAFT_TYPES: EntityType[] = ['characters', 'npcs', 'locations', 'items', 'spells', 'creatures', 'notes', 'groups']
+const DEFAULT_PRIVATE_FIELDS = new Set([
+  'secrets',
+  'personality',
+  'data.motivation',
+  'data.fear',
+  'data.mannerism',
+  'data.hook',
+  'data.dm_notes',
+  'data.plot_hook',
+  'data.curse',
+])
 
 function flattenEntityData(entity?: Record<string, any>) {
   if (!entity) return undefined
@@ -49,6 +61,13 @@ function fieldDefault(type: string) {
   if (type === 'toggle') return true
   if (type === 'tags-input') return []
   return ''
+}
+
+function valueHasContent(value: any) {
+  if (value === undefined || value === null || value === '') return false
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'object') return Object.keys(value).length > 0
+  return true
 }
 
 function SmallField({ label, value, onChange, type = 'text' }: {
@@ -365,6 +384,75 @@ function PendingConnectionsEditor({ campaignId, value, onChange }: {
   )
 }
 
+function FieldVisibilityPanel({
+  fields,
+  form,
+  setData,
+}: {
+  fields: { key: string; label: string }[]
+  form: Record<string, any>
+  setData: (key: string, value: any) => void
+}) {
+  const [collapsed, setCollapsed] = useState(true)
+  const fieldVisibility = form.data?.[FIELD_VISIBILITY_KEY] && typeof form.data[FIELD_VISIBILITY_KEY] === 'object'
+    ? form.data[FIELD_VISIBILITY_KEY]
+    : {}
+  const visibleFields = fields.filter(field => valueHasContent(form[field.key]))
+
+  if (!visibleFields.length) return null
+
+  const visibilityFor = (key: string) =>
+    fieldVisibility[key] ?? (DEFAULT_PRIVATE_FIELDS.has(key) ? 'private' : 'public')
+
+  const setVisibility = (key: string, visibility: 'public' | 'private') => {
+    setData(FIELD_VISIBILITY_KEY, { ...fieldVisibility, [key]: visibility })
+  }
+
+  return (
+    <section className="rounded-xl border border-stone-300 bg-stone-100 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setCollapsed(value => !value)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-stone-200 transition-colors"
+      >
+        <span>
+          <span className="font-display text-base text-parchment">Privacidade das informações</span>
+          <span className="block text-xs text-parchment/35 mt-0.5">Escolha quais caixas ficam públicas para jogadores.</span>
+        </span>
+        <ChevronDown size={16} className={clsx('text-parchment/45 transition-transform', collapsed && '-rotate-90')} />
+      </button>
+
+      <div className={clsx('grid transition-[grid-template-rows] duration-200', collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]')}>
+        <div className="min-h-0 overflow-hidden">
+          <div className="p-4 pt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+            {visibleFields.map(field => {
+              const current = visibilityFor(field.key)
+              return (
+                <div key={field.key} className="rounded border border-stone-300 bg-stone-200 px-3 py-2 flex items-center justify-between gap-3">
+                  <span className="text-sm text-parchment/70 truncate">{field.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => setVisibility(field.key, current === 'private' ? 'public' : 'private')}
+                    className={clsx(
+                      'text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 transition-colors shrink-0',
+                      current === 'private'
+                        ? 'bg-crimson/15 text-crimson-light hover:bg-crimson/25'
+                        : 'bg-gold/15 text-gold hover:bg-gold/25'
+                    )}
+                  >
+                    {current === 'private' ? <Lock size={12} /> : <Globe2 size={12} />}
+                    {current === 'private' ? 'Privado' : 'Público'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const cfg = ENTITY_CONFIG[type]
   const navigate = useNavigate()
@@ -374,6 +462,13 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const allConfigFields = useMemo(
     () => [...cfg.fields, ...(cfg.sections?.flatMap(section => section.fields) ?? [])],
     [cfg.fields, cfg.sections]
+  )
+  const privacyFields = useMemo(
+    () => allConfigFields
+      .filter(field => !['name', 'title', 'visibility', 'shared_with_user_id', 'image_url', 'portrait_url'].includes(field.key))
+      .filter(field => !['toggle', 'slider', 'tags-input'].includes(field.type))
+      .map(field => ({ key: field.key, label: field.label })),
+    [allConfigFields]
   )
   const initialForm = useMemo(
     () => flattenEntityData(initial) ?? {
@@ -404,7 +499,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   const setData = (key: string, val: any) =>
     setForm(f => ({
       ...f,
-      [`data.${key}`]: f[`data.${key}`] !== undefined ? val : f[`data.${key}`],
+      [`data.${key}`]: val,
       data: { ...(f.data ?? {}), [key]: val },
     }))
 
@@ -420,11 +515,14 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     const payload: Record<string, any> = {}
     const dataFields: Record<string, any> = form.data && typeof form.data === 'object' ? { ...form.data } : {}
     for (const [key, value] of Object.entries(form)) {
-      if (key.startsWith('data.')) dataFields[key.slice(5)] = value
-      else payload[key] = value
+      if (key.endsWith('__other')) continue
+      const nextValue = form[`${key}__other`] && value === 'Outro' ? form[`${key}__other`] : value
+      if (key.startsWith('data.')) dataFields[key.slice(5)] = nextValue
+      else payload[key] = nextValue
     }
     payload.data = dataFields
     if (type === 'locations' && payload.parent_id === '') payload.parent_id = null
+    if (type === 'characters' && payload.user_id === '') payload.user_id = null
     if (payload.visibility !== 'user') payload.shared_with_user_id = null
     if (payload.visibility === 'user' && payload.shared_with_user_id === '') payload.shared_with_user_id = null
     if (type === 'spells') {
@@ -496,11 +594,15 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
       const applyField = (key: string, value: any) => {
         if (value === undefined || value === null || value === '') return
         const current = key.startsWith('data.')
-          ? nextData[key.slice(5)]
+          ? next[key] ?? nextData[key.slice(5)]
           : next[key]
         if (isBlank(current)) {
-          if (key.startsWith('data.')) nextData[key.slice(5)] = value
-          else next[key] = value
+          if (key.startsWith('data.')) {
+            nextData[key.slice(5)] = value
+            next[key] = value
+          } else {
+            next[key] = value
+          }
         }
       }
 
@@ -519,11 +621,16 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
   }
 
   const generateDraft = async () => {
-    const name = String(form.name ?? '').trim()
-    if (name.length < 2) return
+    const primaryKey = cfg.fields[0]?.key ?? 'name'
+    const name = String(form[primaryKey] ?? form.name ?? form.title ?? '').trim()
     setDraftError('')
     try {
-      const result = await draft.generate({ entity_type: type, name, hint: draftHint.trim() || undefined })
+      const result = await draft.generate({
+        entity_type: type,
+        name,
+        hint: draftHint.trim() || undefined,
+        data: buildPayload(),
+      })
       applyDraft(result)
     } catch {
       setDraftError('Não foi possível gerar o rascunho agora.')
@@ -563,6 +670,9 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     saving: isPending,
   })
   const imageField = cfg.fields.find(field => field.key === 'image_url' || field.key === 'portrait_url')
+  const characterStateFields = type === 'characters'
+    ? cfg.fields.filter(field => field.key === 'is_alive' || field.key === 'is_active')
+    : []
   const parentOptions = locations.filter((location: any) => location.id !== entityId)
   const parentLocationField = type === 'locations' ? (
     <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-4 flex flex-col gap-1">
@@ -581,17 +691,47 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     </div>
   ) : null
 
+  const renderToggleControl = (field: (typeof cfg.fields)[number]) => (
+    <button
+      type="button"
+      onClick={() => set(field.key, !form[field.key])}
+      className={clsx(
+        'w-10 h-5 rounded-full transition-colors relative shrink-0',
+        form[field.key] ? 'bg-gold' : 'bg-stone-300'
+      )}
+      aria-label={field.label}
+      aria-pressed={!!form[field.key]}
+    >
+      <span className={clsx(
+        'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform',
+        form[field.key] ? 'translate-x-5' : 'translate-x-0.5'
+      )} />
+    </button>
+  )
+
   return (
     <>
     {unsavedDialog}
     <div className="p-8 w-full max-w-[1400px] mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <cfg.icon size={20} className={cfg.accentClass} />
-        <div>
-          <h1 className="font-display text-2xl text-parchment">
-            {isEdit ? `Editar ${cfg.label}` : `Novo ${cfg.label}`}
-          </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <cfg.icon size={20} className={cfg.accentClass} />
+          <div>
+            <h1 className="font-display text-2xl text-parchment">
+              {isEdit ? `Editar ${cfg.label}` : `Novo ${cfg.label}`}
+            </h1>
+          </div>
         </div>
+        {characterStateFields.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {characterStateFields.map(field => (
+              <div key={field.key} className="flex items-center gap-2">
+                {renderToggleControl(field)}
+                <label className="text-sm text-parchment/70">{field.label}</label>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-5">
@@ -608,7 +748,6 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
                 variant="ghost"
                 onClick={generateDraft}
                 loading={draft.isPending}
-                disabled={String(form.name ?? '').trim().length < 2}
               >
                 <Sparkles size={13} /> Gerar rascunho
               </Button>
@@ -635,6 +774,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
 
         {cfg.fields.map(field => {
           if (field.key === 'image_url' || field.key === 'portrait_url') return null
+          if (type === 'characters' && (field.key === 'is_alive' || field.key === 'is_active')) return null
 
           if (field.type === 'text' || field.type === 'number') return (
             <Input
@@ -685,11 +825,23 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
                   className={inputClass}
                 >
                   <option value="">Selecionar...</option>
-                  {field.options
-                    ?.filter(o => field.key !== 'visibility' || o !== 'user' || canShareWithUser)
-                    .map(o => <option key={o} value={o}>{field.key === 'visibility' ? visibilityLabels[o] ?? o : field.optionLabels?.[o] ?? o}</option>)}
+                  {field.key === 'user_id'
+                    ? (campaign?.members ?? []).map(member => (
+                      <option key={member.id} value={member.id}>{member.username}</option>
+                    ))
+                    : field.options
+                      ?.filter(o => field.key !== 'visibility' || o !== 'user' || canShareWithUser)
+                      .map(o => <option key={o} value={o}>{field.key === 'visibility' ? visibilityLabels[o] ?? o : field.optionLabels?.[o] ?? o}</option>)}
                 </select>
               </div>
+              {field.options?.includes('Outro') && form[field.key] === 'Outro' && (
+                <Input
+                  label={`Especificar ${field.label.toLowerCase()}`}
+                  value={form[`${field.key}__other`] ?? ''}
+                  onChange={event => set(`${field.key}__other`, event.target.value)}
+                  placeholder="Digite a opção personalizada..."
+                />
+              )}
               {field.key === 'visibility' && form.visibility === 'user' && (
                 <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 flex flex-col gap-1">
                   <label className="text-sm text-parchment/70 font-medium">Usuário com acesso</label>
@@ -710,6 +862,37 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
           )
 
           if (field.type === 'toggle') return (
+            type === 'characters' && (field.key === 'is_alive' || field.key === 'is_active') ? (
+              field.key === 'is_active' ? null : (
+                <div key="character-state-toggles" className="rounded-lg border border-stone-300 bg-stone-100 px-4 py-3 flex flex-wrap items-center gap-x-8 gap-y-3">
+                  {(['is_alive', 'is_active'] as const).map(toggleKey => {
+                    const toggleField = cfg.fields.find(item => item.key === toggleKey)
+                    if (!toggleField) return null
+                    return (
+                      <div key={toggleKey} className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => set(toggleKey, !form[toggleKey])}
+                          className={clsx(
+                            'w-9 h-5 rounded-full transition-colors relative shrink-0 border',
+                            form[toggleKey] ? 'bg-gold' : 'bg-stone-300'
+                          )}
+                        >
+                          <span className={clsx(
+                            'absolute left-0.5 top-0.5 w-4 h-4 bg-parchment rounded-full shadow transition-transform',
+                            form[toggleKey] ? 'translate-x-4' : 'translate-x-0'
+                          )} />
+                        </button>
+                        <span>
+                          <span className="block text-sm text-parchment/80">{toggleField.label}</span>
+                          <span className="block text-xs text-parchment/35">{form[toggleKey] ? 'Sim' : 'Não'}</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
             <div key={field.key} className="flex items-center gap-3">
               <button
                 type="button"
@@ -726,6 +909,7 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
               </button>
               <label className="text-sm text-parchment/70">{field.label}</label>
             </div>
+            )
           )
 
           if (field.type === 'slider') {
@@ -813,6 +997,12 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
             />
           </div>
         )}
+
+        <FieldVisibilityPanel
+          fields={privacyFields}
+          form={form}
+          setData={setData}
+        />
 
         {cfg.sections?.map(section => (
           <EntitySection

@@ -5,6 +5,7 @@ import { useEntityDetail, useDeleteEntity } from '@/hooks/useEntities'
 import { useCreateLink } from '@/hooks/useLinks'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { LinksPanel } from '@/components/entity/LinksPanel'
+import { PropagationsPanel } from '@/components/entity/PropagationsPanel'
 import { GroupMembersSection } from '@/components/entity/GroupMembersSection'
 import { CreatureStatBlock } from '@/components/entity/CreatureStatBlock'
 import { SpellStatBlock } from '@/components/entity/SpellStatBlock'
@@ -264,6 +265,17 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
             </p>
           )}
 
+          {entity && (
+            <PropagationsPanel
+              campaignId={campaignId!}
+              entityType={entityType!}
+              entityId={entityId!}
+              entityName={entity.name ?? entity.title ?? ''}
+              entityDescription={entity.description ?? entity.content ?? ''}
+              entityData={entity.data}
+            />
+          )}
+
           {imageUrl && !hasStructuredBlock && (
             imageKey === 'portrait_url' ? (
               <img
@@ -288,7 +300,9 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
               {metaFields.map(f => {
                 const val = entity[f.key]
                 if (val === undefined || val === null || val === '') return null
-                const displayVal = f.key === 'visibility'
+                const displayVal = f.key === 'user_id'
+                  ? entity.player_username ?? val
+                  : f.key === 'visibility'
                   ? ({ public: 'Pública', private: 'Privada' } as Record<string, string>)[String(val)] ?? val
                   : typeof val === 'boolean' ? (val ? 'Sim' : 'Não') : val
                 return (
@@ -383,6 +397,8 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
           eventLinks={entity.event_links ?? []}
           tags={entity.tags ?? []}
           canEdit={!!canEdit}
+          entityName={entity.name ?? entity.title ?? ''}
+          entityDescription={entity.description ?? entity.content ?? ''}
         />
       </div>
     </div>

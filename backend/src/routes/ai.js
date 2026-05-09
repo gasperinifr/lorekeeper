@@ -154,11 +154,18 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases
 
   fastify.post('/campaigns/:campaignId/ai/entity-draft', { preHandler: requireEditor }, async (req, reply) => {
     try {
-      const { entity_type, name, hint } = req.body
-      if (!entity_type || !name) return reply.status(400).send({ error: 'entity_type e name são obrigatórios.' })
+      const { entity_type, name, hint, data: draftData } = req.body
+      if (!entity_type) return reply.status(400).send({ error: 'entity_type é obrigatório.' })
 
       const ctx = await getCampaignContext(req.params.campaignId)
       const direction = hint ? ` Direção: "${hint}".` : ''
+      const subject = String(name ?? '').trim() || 'sem nome definido'
+      const draftDataStr = draftData && typeof draftData === 'object'
+        ? JSON.stringify(draftData).slice(0, 1200)
+        : ''
+      const existingInstruction = draftDataStr
+        ? `\nDados já inseridos pelo usuário: ${draftDataStr}\nPreserve esses dados. Use-os como fonte principal e não substitua valores preenchidos; complete apenas o que estiver vazio ou claramente faltando.`
+        : ''
       const DND_5E_RULES = `
 REGRAS TÉCNICAS 5e:
 - Criaturas: use CR plausível para ameaça, valores coerentes de CA/PV/deslocamento e atributos STR/DEX/CON/INT/WIS/CHA de 1 a 30.
@@ -172,36 +179,53 @@ REGRAS TÉCNICAS 5e:
 - Escreva todos os textos mecânicos em português brasileiro com acentos. Evite português literal/truncado.
 `
       const PROMPTS = {
-        npcs: `Crie um rascunho para o NPC chamado "${name}".${direction}
+        characters: `Crie um rascunho para o personagem de jogador chamado "${subject}".${direction}${existingInstruction}
+REGRAS ESPECÍFICAS PARA PERSONAGEM:
+- Use estritamente D&D 5e oficial/SRD em português; não invente sistemas, raças, classes, magias, características ou mecânicas fora de 5e.
+- Se nível, classe, raça ou antecedente já foram inseridos, respeite exatamente esses valores.
+- Ajuste PV, bônus de proficiência, características, equipamento e conjuração ao nível informado.
+- Não substitua antecedente, classe, raça, nível, nome ou qualquer campo já preenchido.
+Retorne JSON:
+{"name":"...","race":"...","class":"...","level":1,"description":"...","backstory":"...","data":{"background":"...","personality_traits":"...","ideals":"...","bonds":"...","flaws":"...","str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10,"armor_class":10,"hit_points":"...","speed":"9 m","proficiency_bonus":"+2","saving_throws":"...","skills":"...","proficiencies":"...","equipment":"...","features":"...","spellcasting":"...","player_notes":"...","goals":"..."}}
+Se o nome estiver como "sem nome definido", invente um nome coerente. Preencha todos os campos com valores úteis e concisos.`,
+        npcs: `Crie um rascunho para o NPC chamado "${subject}".${direction}${existingInstruction}
 Retorne JSON com estes campos (preencha todos):
 {"role":"...","race":"...","description":"...","personality":"...","data":{"age":"...","appearance":"...","voice":"...","motivation":"...","fear":"...","mannerism":"..."}}
 Tambem pode incluir em data: {"dm_notes":"...","plot_hook":"...","hook":"..."} quando fizer sentido.
 IMPORTANTE: seja conciso. Máximo 2 frases por campo. Não invente fatos que contradigam o contexto.`,
-        locations: `Crie um rascunho para o local chamado "${name}".${direction}
+        locations: `Crie um rascunho para o local chamado "${subject}".${direction}${existingInstruction}
 Retorne JSON:
-{"type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruina|Planicie|Porto|Outro","description":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
+{"name":"...","type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruina|Planicie|Porto|Outro","description":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
 IMPORTANTE: preencha todos os campos e seja conciso. Maximo 2 frases por campo.`,
-        creatures: `Crie um rascunho para a criatura chamada "${name}".${direction}
+        creatures: `Crie um rascunho para a criatura chamada "${subject}".${direction}${existingInstruction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"type":"Monstruosidade","cr":"5","description":"Predador de ruínas antigas.","data":{"statBlock":true,"ac":"15 (armadura natural)","hpText":"95 (10d10+40)","speedText":"9 m, escalada 6 m","str":18,"dex":14,"con":18,"int":8,"wis":12,"cha":10,"senses":"visão no escuro 18 m, Percepção passiva 11","languages":"compreende Comum, mas não fala","resist":"frio","immune":"","vulnerable":"","conditionImmune":"","traits":[{"name":"Faro Aguçado","text":"Vantagem em testes de Sabedoria (Percepção) que dependam de olfato."}],"actions":[{"name":"Multiataque","text":"A criatura realiza dois ataques de garra."}],"bonus":[],"reactions":[],"legendary":[]}}
 Retorne JSON:
 {"type":"Aberracao|Besta|Celestial|Construto|Dragao|Elemental|Fada|Fiend|Gigante|Humanoide|Morto-Vivo|Monstruosidade|Planta|Slime|Outro","cr":"...","description":"...","data":{"behavior":"...","habitat":"...","tactics":"...","weaknesses":"...","loot":"...","dm_notes":"...","statBlock":true,"ac":"...","hpText":"...","speedText":"...","str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10,"senses":"...","languages":"...","resist":"...","immune":"...","vulnerable":"...","conditionImmune":"...","traits":[{"name":"...","text":"..."}],"actions":[{"name":"...","text":"..."}],"bonus":[{"name":"...","text":"..."}],"reactions":[{"name":"...","text":"..."}],"legendary":[{"name":"...","text":"..."}]}}
 IMPORTANTE: preencha todos os campos; use listas vazias [] quando não houver entradas. Máximo 2 frases por campo. Toda ação deve ser resolvível na mesa sem interpretação extra.`,
-        items: `Crie um rascunho para o item chamado "${name}".${direction}
+        items: `Crie um rascunho para o item chamado "${subject}".${direction}${existingInstruction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"type":"Arma","rarity":"Raro","description":"Lamina curta com runas de trovão.","properties":"finesse, leve","data":{"itemBlock":true,"weight":1.5,"valueText":"2.000 po","damage":"1d6 perfurante + 1d4 trovao","propertiesText":"finesse, leve","entries":"Quando acerta um ataque, o alvo sofre +1d4 de dano de trovão.","requiresAttunement":false,"appearance":"Aco azulado com runas brilhantes.","history":"Forjada por um anão dos picos.","curse":"","dm_notes":""}}
 Retorne JSON:
 {"type":"Arma|Armadura|Artefato|Consumivel|Ferramenta|Tesouro|Outro","rarity":"Comum|Incomum|Raro|Muito Raro|Lendario|Artefato","description":"...","properties":"...","data":{"appearance":"...","history":"...","curse":"...","dm_notes":"...","itemBlock":true,"weight":0,"valueText":"...","damage":"...","propertiesText":"...","entries":"...","requiresAttunement":false}}
 IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva efeito vago: todo dano, condição, alvo, área, duração e teste devem estar definidos.`,
-        spells: `Crie um rascunho para a magia chamada "${name}".${direction}
+        spells: `Crie um rascunho para a magia chamada "${subject}".${direction}${existingInstruction}
 ${DND_5E_RULES}
 Exemplo de formato valido:
 {"level":3,"school":"Evocacao","casting_time":"1 acao","range":"18 m","components":"V,S,M (um fio de cobre)","duration":"Instantanea","description":"Um raio atinge um alvo visivel.","data":{"spellBlock":true,"castingTime":"1 acao","range":"18 m","componentsText":"V,S,M (um fio de cobre)","duration":"Instantanea","damageInflict":"trovao","savingThrow":"Constituicao","entries":"O alvo faz um teste de resistencia de Constituicao.","higherLevel":[{"name":"Em niveis superiores","text":"O dano aumenta em 1d8 por nivel acima do 3º."}]}}
 Retorne JSON:
 {"level":0,"school":"Abjuracao|Conjuracao|Adivinhacao|Encantamento|Evocacao|Ilusao|Necromancia|Transmutacao","casting_time":"...","range":"...","components":"...","duration":"...","description":"...","data":{"spellBlock":true,"castingTime":"...","range":"...","componentsText":"...","duration":"...","damageInflict":"...","savingThrow":"...","entries":"...","higherLevel":[{"name":"Em niveis superiores","text":"..."}]}}
 IMPORTANTE: preencha todos os campos. Máximo 2 frases por campo. Não escreva efeito vago: todo dano, condição, alvo, área, duração e teste devem estar definidos.`,
+        notes: `Crie um rascunho para uma nota de campanha chamada "${subject}".${direction}${existingInstruction}
+Retorne JSON:
+{"title":"...","content":"...","is_secret":false}
+Se o titulo estiver como "sem nome definido", invente um titulo coerente. O conteudo deve ter 2 a 5 paragrafos curtos e uteis para mesa.`,
+        groups: `Crie um rascunho para um grupo, faccao ou organizacao chamado "${subject}".${direction}${existingInstruction}
+Retorne JSON:
+{"name":"...","type":"...","description":"...","headquarters":"...","motto":"...","secrets":"...","data":{"dm_notes":"...","plot_hook":"..."}}
+Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conciso e preencha todos os campos quando fizer sentido.`,
       }
 
       const prompt = PROMPTS[entity_type]
@@ -252,7 +276,13 @@ Use exatamente um dos ids listados. Nao invente ids, nao use nomes como id e nao
 Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
         600
       )
-      const parsed = parseJSON(text)
+      let parsed
+      try {
+        parsed = parseJSON(text)
+      } catch (parseErr) {
+        req.log.warn({ err: parseErr, text }, 'Resposta inválida da IA ao sugerir links')
+        return reply.send({ suggestions: [] })
+      }
       const suggestions = (parsed.suggestions ?? [])
         .filter(s => Number(s.confidence ?? 0) >= 0.6)
         .map(s => {
@@ -276,6 +306,170 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
       req.log.error({ err }, 'Falha ao sugerir links')
       return reply.status(500).send({ error: aiErrorMessage(err) })
     }
+  })
+
+  fastify.post('/campaigns/:campaignId/ai/suggest-propagations', { preHandler: requireEditor }, async (req, reply) => {
+    try {
+      const { entity_type, entity_id, name, description, data: entityData } = req.body
+
+      if (!entity_type || !entity_id || !name) {
+        return reply.status(400).send({ error: 'entity_type, entity_id e name são obrigatórios.' })
+      }
+
+      const emptyId = '00000000-0000-0000-0000-000000000000'
+      const [npcs, locations, items, characters, notes] = await Promise.all([
+        db.query(
+          `SELECT id, name, role, race, is_alive, description, data FROM npcs
+           WHERE campaign_id=$1 AND id != $2
+           ORDER BY updated_at DESC LIMIT 30`,
+          [req.params.campaignId, entity_type === 'npcs' ? entity_id : emptyId]
+        ),
+        db.query(
+          `SELECT id, name, type, description, data FROM locations
+           WHERE campaign_id=$1 AND id != $2
+           ORDER BY updated_at DESC LIMIT 20`,
+          [req.params.campaignId, entity_type === 'locations' ? entity_id : emptyId]
+        ),
+        db.query(
+          `SELECT id, name, type, description, data FROM items
+           WHERE campaign_id=$1 AND id != $2
+           ORDER BY updated_at DESC LIMIT 20`,
+          [req.params.campaignId, entity_type === 'items' ? entity_id : emptyId]
+        ),
+        db.query(
+          `SELECT id, name, race, class, description, backstory FROM characters
+           WHERE campaign_id=$1 AND id != $2
+           ORDER BY name ASC`,
+          [req.params.campaignId, entity_type === 'characters' ? entity_id : emptyId]
+        ),
+        db.query(
+          `SELECT id, title, content FROM notes
+           WHERE campaign_id=$1 AND id != $2
+           ORDER BY updated_at DESC LIMIT 15`,
+          [req.params.campaignId, entity_type === 'notes' ? entity_id : emptyId]
+        ),
+      ])
+
+      const ctx = `
+NPCs: ${npcs.rows.map(r => `[id:${r.id}] ${r.name} (${r.role ?? 'sem papel'}, ${r.race ?? ''}, ${r.is_alive === false ? 'morto' : 'vivo'})${r.description ? ': ' + r.description.slice(0, 150) : ''}`).join('\n') || 'nenhum'}
+Locais: ${locations.rows.map(r => `[id:${r.id}] ${r.name} (${r.type ?? 'sem tipo'})${r.description ? ': ' + r.description.slice(0, 120) : ''}`).join('\n') || 'nenhum'}
+Itens: ${items.rows.map(r => `[id:${r.id}] ${r.name} (${r.type ?? ''})${r.description ? ': ' + r.description.slice(0, 100) : ''}`).join('\n') || 'nenhum'}
+Personagens: ${characters.rows.map(r => `[id:${r.id}] ${r.name} (${r.race ?? ''} ${r.class ?? ''})`).join('\n') || 'nenhum'}
+Notas: ${notes.rows.map(r => `[id:${r.id}] ${r.title}${r.content ? ': ' + r.content.slice(0, 100) : ''}`).join('\n') || 'nenhuma'}
+      `.trim()
+
+      const entityDesc = description ? description.slice(0, 400) : ''
+      const entityDataStr = entityData && typeof entityData === 'object' ? JSON.stringify(entityData).slice(0, 300) : ''
+
+      const text = await complete(
+        `Você é um assistente especialista em narrativa de RPG que analisa entidades e sugere propagações de estado coerentes no mundo da campanha.
+REGRAS OBRIGATÓRIAS:
+- Responda SOMENTE com JSON válido, sem texto antes ou depois, sem blocos de código
+- Sugira apenas propagações que fazem sentido narrativo real e direto
+- Nunca invente conexões forçadas
+- Para is_alive use apenas true ou false (boolean)
+- Máximo 4 sugestões por chamada
+- Só sugira propagações para entidades cujo id aparece na lista de contexto`,
+        `Entidade recém criada/editada:
+Tipo: ${entity_type}
+ID: ${entity_id}
+Nome: "${name}"
+Descrição: "${entityDesc}"
+${entityDataStr ? `Dados adicionais: ${entityDataStr}` : ''}
+
+Entidades existentes na campanha:
+${ctx}
+
+Com base no nome, descrição e dados da entidade recém criada, identifique propagações de estado que deveriam acontecer em outras entidades já existentes.
+
+Retorne JSON:
+{
+  "propagations": [
+    {
+      "target_type": "npcs|locations|items|characters",
+      "target_id": "uuid-da-entidade-existente",
+      "target_name": "nome da entidade afetada",
+      "field": "nome do campo a atualizar (ex: is_alive, data.rulers, data.curse, description)",
+      "value": "novo valor (string, boolean ou objeto)",
+      "reason": "explicação em 1 frase de por que essa propagação faz sentido"
+    }
+  ]
+}
+
+Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
+        700
+      )
+
+      const parsed = parseJSON(text)
+      const propagations = Array.isArray(parsed?.propagations) ? parsed.propagations : []
+
+      return reply.send({ propagations })
+    } catch (err) {
+      req.log.error({ err }, 'Falha ao sugerir propagações')
+      return reply.status(500).send({ error: aiErrorMessage(err) })
+    }
+  })
+
+  fastify.post('/campaigns/:campaignId/ai/apply-propagation', { preHandler: requireEditor }, async (req, reply) => {
+    const { target_type, target_id, field, value } = req.body
+    const { campaignId } = req.params
+
+    const ALLOWED = {
+      npcs: ['is_alive', 'role', 'description', 'data'],
+      locations: ['description', 'data'],
+      items: ['description', 'data'],
+      characters: ['description', 'is_active', 'data'],
+    }
+
+    const TABLE_MAP = {
+      npcs: 'npcs',
+      locations: 'locations',
+      items: 'items',
+      characters: 'characters',
+    }
+
+    const table = TABLE_MAP[target_type]
+    const allowedFields = ALLOWED[target_type]
+    if (!table || !allowedFields) {
+      return reply.status(400).send({ error: 'target_type inválido.' })
+    }
+
+    const ROOT_FIELDS = new Set(['is_alive', 'is_active', 'role', 'description'])
+
+    if (typeof field !== 'string' || !field.trim()) {
+      return reply.status(400).send({ error: 'Campo inválido para propagação.' })
+    }
+    if (value === undefined) {
+      return reply.status(400).send({ error: 'Valor obrigatório para propagação.' })
+    }
+
+    if (field.startsWith('data.')) {
+      if (!allowedFields.includes('data')) {
+        return reply.status(400).send({ error: `Campo "${field}" não permitido para propagação.` })
+      }
+      const dataPath = field.slice(5).split('.').filter(Boolean)
+      if (!dataPath.length || dataPath.some(part => !/^[\w-]+$/.test(part))) {
+        return reply.status(400).send({ error: 'Subcampo data inválido para propagação.' })
+      }
+      const { rows } = await db.query(
+        `UPDATE ${table}
+         SET data = jsonb_set(COALESCE(data,'{}'::jsonb), $1::text[], $2::jsonb, true), updated_at=NOW()
+         WHERE id=$3 AND campaign_id=$4
+         RETURNING id`,
+        [dataPath, JSON.stringify(value), target_id, campaignId]
+      )
+      if (!rows.length) return reply.status(404).send({ error: 'Entidade não encontrada.' })
+    } else if (ROOT_FIELDS.has(field) && allowedFields.includes(field)) {
+      const { rows } = await db.query(
+        `UPDATE ${table} SET ${field}=$1, updated_at=NOW() WHERE id=$2 AND campaign_id=$3 RETURNING id`,
+        [value, target_id, campaignId]
+      )
+      if (!rows.length) return reply.status(404).send({ error: 'Entidade não encontrada.' })
+    } else {
+      return reply.status(400).send({ error: `Campo "${field}" não permitido para propagação.` })
+    }
+
+    return reply.send({ ok: true, target_type, target_id, field, value })
   })
 
   function oracleMode(req) {

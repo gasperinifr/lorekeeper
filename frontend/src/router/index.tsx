@@ -19,6 +19,7 @@ import { ChroniclePage }      from '@/pages/campaigns/ChroniclePage'
 import { RelationshipGraphPage } from '@/pages/campaigns/RelationshipGraphPage'
 import { SearchPage }         from '@/pages/campaigns/SearchPage'
 import { TavernaPage }        from '@/pages/campaigns/TavernaPage'
+import { DiaryPage }          from '@/pages/campaigns/DiaryPage'
 import { OraclePage }         from '@/pages/campaigns/OraclePage'
 import { useCampaign }        from '@/hooks/useCampaign'
 import { useEntityDetail }    from '@/hooks/useEntities'
@@ -44,6 +45,16 @@ function RequireEditor({ children }: { children: JSX.Element }) {
   const { data: campaign, isLoading } = useCampaign(campaignId!)
   if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
   if (!['admin', 'editor'].includes(campaign?.role ?? '')) {
+    return <Navigate to={`/campaigns/${campaignId}`} replace />
+  }
+  return children
+}
+
+function RequireAdmin({ children }: { children: JSX.Element }) {
+  const { campaignId } = useParams<{ campaignId: string }>()
+  const { data: campaign, isLoading } = useCampaign(campaignId!)
+  if (isLoading) return <div className="p-8 text-parchment/30 text-sm">Carregando...</div>
+  if (campaign?.role !== 'admin') {
     return <Navigate to={`/campaigns/${campaignId}`} replace />
   }
   return children
@@ -90,7 +101,7 @@ export const router = createBrowserRouter([
 
       // Overview e settings da campanha
       { path: '/campaigns/:campaignId',          element: <CampaignOverview /> },
-      { path: '/campaigns/:campaignId/settings', element: <RequireEditor><CampaignSettings /></RequireEditor> },
+      { path: '/campaigns/:campaignId/settings', element: <RequireAdmin><CampaignSettings /></RequireAdmin> },
 
       // Locais com página própria (tree view)
       { path: '/campaigns/:campaignId/locations',           element: <LocationsPage /> },
@@ -115,6 +126,7 @@ export const router = createBrowserRouter([
       // Busca
       { path: '/campaigns/:campaignId/search', element: <SearchPage /> },
       { path: '/campaigns/:campaignId/taverna', element: <TavernaPage /> },
+      { path: '/campaigns/:campaignId/diary', element: <DiaryPage /> },
       { path: '/campaigns/:campaignId/oracle', element: <OraclePage /> },
     ],
   },

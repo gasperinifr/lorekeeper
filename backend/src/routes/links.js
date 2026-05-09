@@ -22,6 +22,7 @@ const LINK_TABLES = {
 function normalizeLinkBody(body) {
   return {
     relation_type: RELATION_TYPES.includes(body.relation_type) ? body.relation_type : 'outro',
+    relation_label: body.relation_label ? String(body.relation_label).slice(0, 100) : null,
   }
 }
 
@@ -44,8 +45,8 @@ export async function linkRoutes(fastify) {
   })
 
   fastify.post('/campaigns/:campaignId/links', { preHandler: requireEditor }, async (req, reply) => {
-    const { source_type, source_id, target_type, target_id, relation_label } = req.body
-    const { relation_type } = normalizeLinkBody(req.body)
+    const { source_type, source_id, target_type, target_id } = req.body
+    const { relation_type, relation_label } = normalizeLinkBody(req.body)
     for (const t of [source_type, target_type]) {
       if (!VALID.includes(t)) return reply.status(400).send({ error: `Tipo inválido: ${t}` })
     }

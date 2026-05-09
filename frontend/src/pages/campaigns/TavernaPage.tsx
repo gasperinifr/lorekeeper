@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AtSign, Image as ImageIcon, MessageSquare, Send, Trash2, X } from 'lucide-react'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
@@ -37,6 +37,33 @@ function messageTimestamp(value: string) {
     return `${sentAt.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')} ${time}`
   }
   return `${sentAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${time}`
+}
+
+function renderLinkedText(text: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const urlRegex = /https?:\/\/[^\s<>"']+/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    const url = match[0]
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index))
+    nodes.push(
+      <a
+        key={`${url}-${match.index}`}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-gold hover:text-gold-light underline decoration-gold/30 underline-offset-2 break-all"
+      >
+        {url}
+      </a>
+    )
+    lastIndex = match.index + url.length
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
+  return nodes
 }
 
 export function TavernaPage() {
@@ -150,6 +177,20 @@ export function TavernaPage() {
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {isLoading && <p className="text-sm text-parchment/30">Carregando mensagens...</p>}
         <div className="flex flex-col gap-2 w-full max-w-[1400px] mx-auto">
+          {!isLoading && (messages ?? []).length === 0 && (
+            <div className="min-h-[45vh] flex flex-col items-center justify-center text-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-gold/15 text-gold flex items-center justify-center">
+                <MessageSquare size={24} />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl text-parchment">A Taverna está quieta</h2>
+                <p className="text-sm text-parchment/35 mt-1 max-w-lg">
+                  Converse com o grupo, cite entidades da campanha e compartilhe imagens durante a sessão.
+                </p>
+              </div>
+            </div>
+          )}
+
           {(messages ?? []).map(message => {
             const own = message.user_id === user?.id
             const canDelete = own || canModerate
@@ -172,7 +213,7 @@ export function TavernaPage() {
                       </button>
                     )}
                   </div>
-                  {message.content && <p className="text-sm text-parchment/80 whitespace-pre-wrap leading-relaxed">{message.content}</p>}
+                  {message.content && <p className="text-sm text-parchment/80 whitespace-pre-wrap leading-relaxed">{renderLinkedText(message.content)}</p>}
                   {message.image_url && (
                     <img
                       src={message.image_url}

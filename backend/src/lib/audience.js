@@ -21,6 +21,23 @@ const PRIVATE_DATA_KEYS = new Set([
   'curse',
 ])
 
+const FIELD_VISIBILITY_KEY = '_field_visibility'
+const DEFAULT_PRIVATE_FIELDS = new Set([
+  'secrets',
+  'personality',
+  'data.motivation',
+  'data.fear',
+  'data.mannerism',
+  'data.hook',
+  'data.dm_notes',
+  'data.plot_hook',
+  'data.curse',
+])
+const PLAYER_ONLY_CHARACTER_FIELDS = new Set([
+  'data.player_notes',
+  'data.goals',
+])
+
 export function isAdmin(req) {
   return req.campaignRole === 'admin'
 }
@@ -40,7 +57,7 @@ export function canViewDm(req) {
 export function sanitizePrivateData(data, req) {
   if (canViewDm(req) || !data || typeof data !== 'object' || Array.isArray(data)) return data
   return Object.fromEntries(
-    Object.entries(data).filter(([key]) => !PRIVATE_DATA_KEYS.has(key))
+    Object.entries(data).filter(([key]) => key !== FIELD_VISIBILITY_KEY && !PRIVATE_DATA_KEYS.has(key))
   )
 }
 
@@ -61,11 +78,46 @@ export function protectPrivateWrite(body, req, existing = {}) {
 export function sanitizeEntityRow(row, req, table = '') {
   if (!row) return row
   const next = { ...row }
+  const fieldVisibility = next.data && typeof next.data === 'object' && !Array.isArray(next.data)
+    ? next.data[FIELD_VISIBILITY_KEY] ?? {}
+    : {}
+  const isOwner = next.user_id && next.user_id === req.user?.id
+  const hideRoot = (key) => {
+    delete next[key]
+  }
+  const hideDataKey = (key) => {
+    if (!next.data || typeof next.data !== 'object' || Array.isArray(next.data)) return
+    const data = { ...next.data }
+    delete data[key]
+    next.data = data
+  }
+
+  if (table === 'characters') {
+    for (const field of PLAYER_ONLY_CHARACTER_FIELDS) {
+      if (!isOwner) hideDataKey(field.slice(5))
+    }
+  }
+
   if (!canViewDm(req)) {
     delete next.secrets
     if (table === 'sessions') delete next.dm_notes
+
+    const allPrivateFields = new Set([
+      ...DEFAULT_PRIVATE_FIELDS,
+      ...Object.entries(fieldVisibility)
+        .filter(([, visibility]) => visibility === 'private')
+        .map(([field]) => field),
+    ])
+    for (const field of allPrivateFields) {
+      if (field.startsWith('data.')) hideDataKey(field.slice(5))
+      else hideRoot(field)
+    }
   }
-  if (next.data !== undefined) next.data = sanitizePrivateData(next.data, req)
+  if (next.data !== undefined) {
+    next.data = canViewDm(req)
+      ? next.data
+      : sanitizePrivateData(next.data, req)
+  }
   return next
 }
 

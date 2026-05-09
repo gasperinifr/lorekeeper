@@ -23,7 +23,6 @@ type GraphNode = {
   entityId: string
   type: GraphType
   label: string
-  subtitle: string
   path: string
   icon: React.ElementType
   accentClass: string
@@ -60,8 +59,12 @@ function edgeStyle(edge: GraphEdge) {
   return {
     stroke: RELATION_TYPE_HEX[edge.relation_type ?? 'outro'],
     strokeWidth: 1.6,
-    opacity: 0.72,
+    opacity: 0.62,
   }
+}
+
+function zoomFade(scale: number, start: number, end: number) {
+  return Math.max(0, Math.min(1, (scale - start) / (end - start)))
 }
 
 const TYPE_META: Partial<Record<GraphType, {
@@ -113,14 +116,6 @@ function displayName(type: GraphType, item: any) {
   return item.title ?? item.name ?? item.id
 }
 
-function displaySub(type: GraphType, item: any) {
-  if (isEntityType(type)) return ENTITY_CONFIG[type].displaySub(item)
-  if (type === 'arcs') return item.status ?? ''
-  if (type === 'sessions') return item.played_at ? new Date(item.played_at).toLocaleDateString('pt-BR') : item.status ?? ''
-  if (type === 'events') return [item.impact, item.type].filter(Boolean).join(' - ')
-  return ''
-}
-
 function itemPath(campaignId: string, type: GraphType, item: any, id: string) {
   if (type === 'arcs') return `/campaigns/${campaignId}/arcs/${id}`
   if (type === 'sessions') return `/campaigns/${campaignId}/arcs/${item?.arc_id}/sessions/${id}`
@@ -142,6 +137,7 @@ export function RelationshipGraphPage() {
   const [enabledTypes, setEnabledTypes] = useState<GraphType[]>(GRAPH_TYPES)
   const [size, setSize] = useState({ width: 960, height: 620 })
   const [version, setVersion] = useState(0)
+  const [zoomScale, setZoomScale] = useState(1)
 
   const characters = useEntityList(campaignId!, 'characters')
   const npcs = useEntityList(campaignId!, 'npcs')
@@ -188,7 +184,6 @@ export function RelationshipGraphPage() {
           entityId: item.id,
           type,
           label: displayName(type, item),
-          subtitle: displaySub(type, item),
           path: itemPath(campaignId!, type, item, item.id),
           icon: meta.icon,
           accentClass: meta.accentClass,
@@ -197,7 +192,7 @@ export function RelationshipGraphPage() {
       })
     })
 
-    const graphEdges = [
+    const graphEdges: GraphEdge[] = [
       ...(links.data ?? [])
         .filter((link: EntityLink) => active.has(link.source_type) && active.has(link.target_type))
         .map((link: EntityLink) => ({
@@ -235,12 +230,16 @@ export function RelationshipGraphPage() {
         return eventEdges
       }),
     ]
-      .filter(edge => allNodes.has(edge.source) && allNodes.has(edge.target))
+      .filter(edge => {
+        const sourceId = edge.source as string
+        const targetId = edge.target as string
+        return allNodes.has(sourceId) && allNodes.has(targetId)
+      })
 
     const connected = new Set<string>()
     graphEdges.forEach(edge => {
-      connected.add(edge.source)
-      connected.add(edge.target)
+      connected.add(edge.source as string)
+      connected.add(edge.target as string)
     })
 
     return {
@@ -284,11 +283,17 @@ export function RelationshipGraphPage() {
     const simulationNodes = nodes.map(node => ({ ...node }))
     const simulationEdges = edges.map(edge => ({ ...edge }))
 
+    const compactness = simulationNodes.length > 35 ? 0.78 : simulationNodes.length > 18 ? 0.9 : 1
+    const linkDistance = Math.round(142 * compactness)
+    const chargeStrength = simulationNodes.length > 35 ? -185 : simulationNodes.length > 18 ? -245 : -320
+
     const simulation = d3.forceSimulation(simulationNodes)
-      .force('link', d3.forceLink(simulationEdges).id((node: GraphNode) => node.id).distance(150).strength(0.55))
-      .force('charge', d3.forceManyBody().strength(-560))
+      .force('link', d3.forceLink(simulationEdges).id((node: GraphNode) => node.id).distance(linkDistance).strength(0.62))
+      .force('charge', d3.forceManyBody().strength(chargeStrength).distanceMax(360))
       .force('center', d3.forceCenter(size.width / 2, size.height / 2))
-      .force('collision', d3.forceCollide().radius(54))
+      .force('x', d3.forceX(size.width / 2).strength(0.04))
+      .force('y', d3.forceY(size.height / 2).strength(0.04))
+      .force('collision', d3.forceCollide().radius(50))
       .on('tick', () => {
         simulationNodes.forEach((node: GraphNode, index: number) => {
           nodes[index].x = node.x
@@ -301,6 +306,7 @@ export function RelationshipGraphPage() {
       .scaleExtent([0.06, 4.5])
       .on('zoom', (event: any) => {
         lastTransformRef.current = event.transform
+        setZoomScale(event.transform.k)
         d3.select(svg).select('.graph-stage').attr('transform', event.transform)
       })
     zoomRef.current = zoom
@@ -455,6 +461,7 @@ export function RelationshipGraphPage() {
                   const tx = target.x ?? size.width / 2
                   const ty = target.y ?? size.height / 2
                   const style = edgeStyle(edge)
+                  const title = edge.label ? `${edge.label}${edge.relation_type ? ` (${edge.relation_type})` : ''}` : edge.relation_type
                   return (
                     <g key={`${edge.id}-${version}`}>
                       <line
@@ -466,6 +473,7 @@ export function RelationshipGraphPage() {
                         strokeWidth={style.strokeWidth}
                         opacity={style.opacity}
                       />
+                      {title && <title>{title}</title>}
                     </g>
                   )
                 })}
@@ -491,63 +499,40 @@ export function RelationshipGraphPage() {
                         navigate(node.path)
                       }}
                     >
-                      <circle className="graph-node-circle" r={25} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.6} />
-                      <foreignObject x={-10} y={-10} width={20} height={20} className="pointer-events-none">
-                        <Icon size={20} color={node.color} />
+                      <circle className="graph-node-circle" r={15} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.4} />
+                      <foreignObject x={-8} y={-8} width={16} height={16} className="pointer-events-none">
+                        <Icon size={16} color={node.color} />
                       </foreignObject>
                     </g>
                   )
                 })}
               </g>
 
-              {/* Camada 3: Labels de edges (relações) */}
-              <g className="edge-labels-layer" style={{ pointerEvents: 'none' }}>
-                {edges.map(edge => {
-                  if (!edge.label) return null
-                  const source = typeof edge.source === 'string' ? nodeById.get(edge.source) : edge.source
-                  const target = typeof edge.target === 'string' ? nodeById.get(edge.target) : edge.target
-                  if (!source || !target) return null
-                  const sx = source.x ?? size.width / 2
-                  const sy = source.y ?? size.height / 2
-                  const tx = target.x ?? size.width / 2
-                  const ty = target.y ?? size.height / 2
-                  return (
-                    <text
-                      key={`label-${edge.id}-${version}`}
-                      x={(sx + tx) / 2}
-                      y={(sy + ty) / 2}
-                      textAnchor="middle"
-                      className="fill-parchment/60 text-[10px]"
-                      paintOrder="stroke"
-                      stroke="#26221a"
-                      strokeWidth={4}
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      {edge.label}
-                    </text>
-                  )
-                })}
-              </g>
-
-              {/* Camada 4: Labels de nós (nomes) - sempre no topo */}
+              {/* Camada 3: Labels de nós (nomes) - sempre no topo */}
               <g className="node-labels-layer" style={{ pointerEvents: 'none' }}>
                 {nodes.map(node => {
                   const x = node.x ?? size.width / 2
                   const y = node.y ?? size.height / 2
+                  const opacity = zoomFade(zoomScale, 0.7, 1.35)
+                  if (opacity <= 0.02) return null
+
                   return (
                     <g
                       key={`labels-${node.id}`}
                       transform={`translate(${x}, ${y})`}
                       style={{ pointerEvents: 'none' }}
                     >
-                      <text y={42} textAnchor="middle" className="fill-parchment text-[12px] font-medium" style={{ pointerEvents: 'none' }}>
+                      <text
+                        y={36}
+                        textAnchor="middle"
+                        className="fill-parchment text-[12px] font-medium"
+                        paintOrder="stroke"
+                        stroke="#26221a"
+                        strokeWidth={4}
+                        style={{ opacity, pointerEvents: 'none', transition: 'opacity 140ms ease-out' }}
+                      >
                         {node.label.length > 24 ? `${node.label.slice(0, 23)}...` : node.label}
                       </text>
-                      {node.subtitle && (
-                        <text y={57} textAnchor="middle" className="fill-parchment/35 text-[10px]" style={{ pointerEvents: 'none' }}>
-                          {node.subtitle.length > 28 ? `${node.subtitle.slice(0, 27)}...` : node.subtitle}
-                        </text>
-                      )}
                     </g>
                   )
                 })}

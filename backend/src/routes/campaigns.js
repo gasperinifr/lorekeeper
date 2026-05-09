@@ -27,6 +27,14 @@ function canAssignRole(req, role, playRole) {
   return (role !== 'admin' && playRole !== 'gm') || req.campaignRole === 'admin'
 }
 
+function requireAdminRole(req, reply) {
+  if (req.campaignRole !== 'admin') {
+    reply.status(403).send({ error: 'Apenas administradores podem acessar as configurações da campanha.' })
+    return false
+  }
+  return true
+}
+
 export async function campaignRoutes(fastify) {
   const { db } = fastify
 
@@ -107,6 +115,7 @@ export async function campaignRoutes(fastify) {
   })
 
   fastify.patch('/:campaignId', { preHandler: requireEditor }, async (req, reply) => {
+    if (!requireAdminRole(req, reply)) return
     const fields = ['title','description','scenario_type','status','visibility','cover_image_url','hub_banner_url','hub_banner_fit','hub_banner_position','started_at','estimated_end_at']
     const updates = []; const vals = []; let i = 1
     for (const f of fields) {
@@ -126,6 +135,7 @@ export async function campaignRoutes(fastify) {
   })
 
   fastify.post('/:campaignId/members', { preHandler: requireEditor }, async (req, reply) => {
+    if (!requireAdminRole(req, reply)) return
     const { email, role, play_role } = req.body
     const memberRole = assertRole(role)
     const memberPlayRole = assertPlayRole(play_role)
@@ -164,6 +174,7 @@ export async function campaignRoutes(fastify) {
   })
 
   fastify.post('/:campaignId/invites', { preHandler: requireEditor }, async (req, reply) => {
+    if (!requireAdminRole(req, reply)) return
     const { email, role, play_role } = req.body
     const inviteRole = assertRole(role)
     const invitePlayRole = assertPlayRole(play_role)

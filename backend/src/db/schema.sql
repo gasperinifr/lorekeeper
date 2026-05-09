@@ -371,3 +371,19 @@ CREATE INDEX IF NOT EXISTS idx_group_members_npc    ON group_members(campaign_id
 CREATE INDEX IF NOT EXISTS idx_group_members_char   ON group_members(campaign_id, character_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_unique_npc ON group_members(group_id, npc_id) WHERE npc_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_unique_char ON group_members(group_id, character_id) WHERE character_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS diary_messages (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  author_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+  channel     VARCHAR(20) NOT NULL DEFAULT 'group',
+  player_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+  content     TEXT NOT NULL,
+  image_url   TEXT,
+  mentions    JSONB DEFAULT '[]',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_diary_campaign       ON diary_messages(campaign_id, channel, created_at);
+CREATE INDEX IF NOT EXISTS idx_diary_private_player ON diary_messages(campaign_id, player_id, created_at);

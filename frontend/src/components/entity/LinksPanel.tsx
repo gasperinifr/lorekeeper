@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookMarked, Calendar, GitBranch, Link2, Plus, X } from 'lucide-react'
+import { BookMarked, Calendar, GitBranch, Link2, Plus, Sparkles, X } from 'lucide-react'
 import { useCreateLink, useDeleteLink } from '@/hooks/useLinks'
+import { useSuggestLinks, type LinkSuggestion } from '@/hooks/useSuggestLinks'
 import { ENTITY_CONFIG, ENTITY_TYPES } from '@/config/entityConfig'
 import { useEntityList } from '@/hooks/useEntities'
 import { useArcs, useCampaignSessions } from '@/hooks/useArcs'
@@ -19,6 +20,8 @@ interface Props {
   eventLinks?: EntityEventLink[]
   tags: Tag[]
   canEdit: boolean
+  entityName?: string
+  entityDescription?: string
 }
 
 type LinkableOption = {
@@ -87,8 +90,10 @@ function isEntityType(type: LinkableType): type is EntityType {
   return type in ENTITY_CONFIG
 }
 
-export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit }: Props) {
+export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks = [], tags, canEdit, entityName = '', entityDescription = '' }: Props) {
   const [adding, setAdding] = useState(false)
+  const [suggestedLinks, setSuggestedLinks] = useState<LinkSuggestion[]>([])
+  const [suggestionError, setSuggestionError] = useState('')
   const initialLinkForm = {
     target_type: '' as LinkableType | '',
     target_id: '',
@@ -99,6 +104,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
 
   const createLink = useCreateLink(campaignId)
   const deleteLink = useDeleteLink(campaignId)
+  const suggestLinks = useSuggestLinks(campaignId)
   const addEventLink = useAddEventLink(campaignId, form.target_type === 'events' ? form.target_id : '')
 
   const characters = useEntityList(campaignId, 'characters')
@@ -160,6 +166,34 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
     setForm(initialLinkForm)
   }
 
+  const loadSuggestedLinks = async () => {
+    if (!isEntityType(entityType)) return
+    setSuggestionError('')
+    try {
+      const suggestions = await suggestLinks.suggest({
+        entity_type: entityType,
+        entity_id: entityId,
+        name: entityName,
+        description: entityDescription,
+      })
+      setSuggestedLinks(suggestions)
+    } catch (err: any) {
+      setSuggestionError(err.message ?? 'Nao foi possivel buscar sugestoes.')
+    }
+  }
+
+  const connectSuggestion = async (suggestion: LinkSuggestion) => {
+    await createLink.mutateAsync({
+      source_type: entityType,
+      source_id: entityId,
+      target_type: suggestion.target_type,
+      target_id: suggestion.target_id,
+      relation_label: suggestion.relation_label,
+      relation_type: suggestion.relation_type,
+    })
+    setSuggestedLinks(current => current.filter(item => item !== suggestion))
+  }
+
   const getLinkedTarget = (link: EntityLink) => {
     const isSource = link.source_id === entityId && link.source_type === entityType
     return {
@@ -218,6 +252,56 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
 
         {adding && (
           <div className="bg-stone-200 border border-stone-300 rounded-lg p-3 mb-3 flex flex-col gap-2">
+            {isEntityType(entityType) && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={loadSuggestedLinks}
+                loading={suggestLinks.isPending}
+              >
+                <Sparkles size={13} /> Conexões sugeridas
+              </Button>
+            )}
+
+            {suggestedLinks.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {suggestedLinks.map(suggestion => (
+                  <div key={`${suggestion.target_type}-${suggestion.target_id}`} className="rounded border border-gold/20 bg-gold/5 p-2 flex flex-col gap-2">
+                    <div>
+                      <p className="text-xs text-parchment">
+                        {suggestion.target_name ?? suggestion.target_id}
+                        <span className="text-gold ml-2">{RELATION_TYPE_LABELS[suggestion.relation_type]}</span>
+                      </p>
+                      {suggestion.relation_label && (
+                        <p className="text-xs text-parchment/35 mt-0.5">{suggestion.relation_label}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => connectSuggestion(suggestion)}
+                        loading={createLink.isPending}
+                        className="flex-1"
+                      >
+                        Conectar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setSuggestedLinks(current => current.filter(item => item !== suggestion))}
+                      >
+                        Ignorar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {suggestionError && <p className="text-xs text-crimson-light">{suggestionError}</p>}
+
             <select
               value={form.target_type}
               onChange={e => setForm(f => ({ ...f, target_type: e.target.value as LinkableType, target_id: '' }))}

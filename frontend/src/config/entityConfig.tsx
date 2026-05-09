@@ -32,8 +32,9 @@ const VISIBILITY_FIELD: FieldDef = {
 }
 
 const DND_CLASSES = [
+  'Artífice',
   'Bárbaro', 'Bardo', 'Bruxo', 'Clérigo', 'Druida', 'Feiticeiro',
-  'Guerreiro', 'Ladino', 'Mago', 'Monge', 'Paladino', 'Patrulheiro',
+  'Guerreiro', 'Ladino', 'Mago', 'Monge', 'Paladino', 'Patrulheiro', 'Outro',
 ]
 
 const DND_ABILITIES: FieldDef[] = [
@@ -63,7 +64,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
     icon: Users, accentClass: 'text-sky-400',
     fields: [
       { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'data.player_name', label: 'Nome do jogador', type: 'text', placeholder: 'Nome de quem joga este personagem' },
+      { key: 'user_id', label: 'Jogador', type: 'select' },
       { key: 'race', label: 'Raça / linhagem', type: 'text', placeholder: 'Humano, elfo, anão...' },
       { key: 'class', label: 'Classe', type: 'select', options: DND_CLASSES },
       { key: 'level', label: 'Nível', type: 'number', placeholder: '1' },
@@ -113,7 +114,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
       },
     ],
     displayName: e => e.name,
-    displaySub: e => [e.data?.player_name ? `Jogador: ${e.data.player_name}` : null, e.race, e.class, e.level ? `Nível ${e.level}` : null, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' - '),
+    displaySub: e => [e.player_username ? `Jogador: ${e.player_username}` : null, e.race, e.class, e.level ? `Nível ${e.level}` : null, e.is_alive === false ? 'Morto' : null].filter(Boolean).join(' - '),
   },
 
   npcs: {

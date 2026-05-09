@@ -13,7 +13,7 @@ const ENTITY_CONFIG = {
   characters: {
     table: 'characters', required: ['name'],
     fields: ['name','race','class','level','description','backstory','portrait_url','is_alive','is_active','visibility','shared_with_user_id','data','user_id'],
-    listOrder: 'name ASC',
+    listOrder: 'name ASC', extraSelect: ',(SELECT username FROM users WHERE users.id=characters.user_id) AS player_username',
   },
   npcs: {
     table: 'npcs', required: ['name'],
@@ -172,7 +172,7 @@ export async function entityRoutes(fastify) {
       const canSeePrivateEvents = ['admin', 'editor'].includes(req.campaignRole)
       const eventVisibility = canSeePrivateEvents ? '' : "AND e.visibility='public'"
       const [e, l, t, ev] = await Promise.all([
-        db.query(`SELECT * FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`, [req.params.id, req.params.campaignId, ...access.vals]),
+        db.query(`SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`, [req.params.id, req.params.campaignId, ...access.vals]),
         db.query(`SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type=$2 AND source_id=$3) OR (target_type=$2 AND target_id=$3))`, [req.params.campaignId, entityType, req.params.id]),
         db.query(`SELECT t.id,t.name,t.color FROM tags t JOIN entity_tags et ON et.tag_id=t.id WHERE et.entity_type=$1 AND et.entity_id=$2`, [entityType, req.params.id]),
         db.query(

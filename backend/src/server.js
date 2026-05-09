@@ -16,6 +16,7 @@ import { uploadRoutes }     from './routes/uploads.js'
 import { fiveEtoolsRoutes } from './routes/fiveEtools.js'
 import { aiRoutes }         from './routes/ai.js'
 import { chatRoutes }       from './routes/chat.js'
+import { diaryRoutes }      from './routes/diary.js'
 import { eventRoutes }      from './routes/events.js'
 import { groupRoutes }      from './routes/groups.js'
 
@@ -37,6 +38,7 @@ fastify.register(uploadRoutes)
 fastify.register(fiveEtoolsRoutes)
 fastify.register(aiRoutes)
 fastify.register(chatRoutes)
+fastify.register(diaryRoutes)
 fastify.register(eventRoutes)
 fastify.register(groupRoutes)
 

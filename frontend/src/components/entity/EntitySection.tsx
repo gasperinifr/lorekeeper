@@ -60,7 +60,19 @@ function TagsInput({ field, value, onChange }: { field: FieldDef; value: string[
   )
 }
 
-function EntitySectionField({ field, value, onChange }: { field: FieldDef; value: any; onChange: (value: any) => void }) {
+function EntitySectionField({
+  field,
+  value,
+  otherValue,
+  onChange,
+  onOtherChange,
+}: {
+  field: FieldDef
+  value: any
+  otherValue?: any
+  onChange: (value: any) => void
+  onOtherChange: (value: any) => void
+}) {
   if (field.type === 'text' || field.type === 'number') {
     return (
       <input
@@ -89,12 +101,22 @@ function EntitySectionField({ field, value, onChange }: { field: FieldDef; value
 
   if (field.type === 'select') {
     return (
-      <select value={value ?? ''} onChange={event => onChange(event.target.value)} className={inputClass}>
-        <option value="">Selecionar...</option>
-        {field.options?.map(option => (
-          <option key={option} value={option}>{field.optionLabels?.[option] ?? option}</option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-2">
+        <select value={value ?? ''} onChange={event => onChange(event.target.value)} className={inputClass}>
+          <option value="">Selecionar...</option>
+          {field.options?.map(option => (
+            <option key={option} value={option}>{field.optionLabels?.[option] ?? option}</option>
+          ))}
+        </select>
+        {field.options?.includes('Outro') && value === 'Outro' && (
+          <input
+            value={otherValue ?? ''}
+            onChange={event => onOtherChange(event.target.value)}
+            placeholder="Digite a opção personalizada..."
+            className={inputClass}
+          />
+        )}
+      </div>
     )
   }
 
@@ -173,7 +195,9 @@ export function EntitySection({ section, formValues, onChange }: Props) {
                 <EntitySectionField
                   field={field}
                   value={formValues[field.key]}
+                  otherValue={formValues[`${field.key}__other`]}
                   onChange={value => onChange(field.key, value)}
+                  onOtherChange={value => onChange(`${field.key}__other`, value)}
                 />
               </label>
             ))}
