@@ -156,6 +156,7 @@ export const ENTITY_CONFIG: Record<EntityType, EntityConfig> = {
           { key: 'secrets', label: 'Segredos (DM)', type: 'textarea', rows: 3, hint: 'Visível apenas ao mestre.' },
           { key: 'data.dm_notes', label: 'Notas do DM', type: 'textarea', rows: 2 },
           { key: 'data.plot_hook', label: 'Gancho narrativo', type: 'textarea', rows: 2, placeholder: 'Como esse NPC pode mover a historia?' },
+          { key: 'data.hook', label: 'Como encontrar', type: 'textarea', rows: 3, placeholder: 'Onde e como o grupo pode encontrar ou conhecer este NPC...' },
         ],
       },
     ],

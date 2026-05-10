@@ -164,7 +164,11 @@ function EventCard({ event, campaignId, lookup, canEdit, onEdit, onDelete }: {
                   const item = (lookup[link.entity_type] ?? []).find(entry => entry.id === link.entity_id)
                   const path = entityPath(campaignId, link.entity_type, item, link.entity_id)
                   return (
-                    <div key={link.id} className="flex items-center justify-between gap-3 rounded-lg border border-stone-300 bg-stone-200 px-3 py-2">
+                    <div
+                      key={link.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-stone-300 bg-stone-200 px-3 py-2"
+                      title={[item ? displayName(link.entity_type, item) : link.entity_id, meta.label, link.role].filter(Boolean).join(' - ')}
+                    >
                       <div className="min-w-0">
                         <p className="text-sm text-parchment truncate">
                           {item ? displayName(link.entity_type, item) : link.entity_id}
@@ -301,9 +305,9 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
   const error = createEvent.error ?? updateEvent.error ?? addLink.error ?? removeLink.error
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-stone-100 border border-stone-300 rounded-xl shadow-xl">
-        <div className="flex items-center justify-between border-b border-stone-300 px-5 py-4 sticky top-0 bg-stone-100 z-10">
+    <div className="fixed inset-0 z-50 bg-ink/75 flex items-start justify-center overflow-y-auto p-6">
+      <div className="w-full max-w-5xl max-h-[calc(100vh-3rem)] bg-stone-100 border border-stone-300 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b border-stone-300 px-6 py-5 bg-stone-100 shrink-0">
           <div>
             <h2 className="font-display text-xl text-parchment">{event ? 'Editar Evento' : 'Novo Evento'}</h2>
             <p className="text-xs text-parchment/35 mt-0.5">Registre o acontecimento e suas conexões.</p>
@@ -313,7 +317,8 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
           </button>
         </div>
 
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] gap-5">
+          <section className="lg:col-span-2 rounded-lg border border-stone-300 bg-stone-200/45 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <Input
               label="Título *"
@@ -410,7 +415,11 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
             </select>
           </div>
 
-          <div className="md:col-span-2 flex flex-col gap-1">
+          </section>
+
+          <section className="rounded-lg border border-stone-300 bg-stone-200/45 p-4 flex flex-col gap-3">
+          <h3 className="text-xs uppercase tracking-widest text-parchment/30">Descrição</h3>
+          <div className="flex flex-col gap-1">
             <label className="text-sm text-parchment/70 font-medium">Descrição</label>
             <textarea
               value={form.description}
@@ -419,10 +428,14 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
               className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment placeholder-parchment/40 focus:outline-none focus:border-gold/60 resize-y"
             />
           </div>
+          </section>
 
-          <div className="md:col-span-2 border-t border-stone-300 pt-4">
-            <h3 className="text-xs uppercase tracking-widest text-parchment/30 mb-3">Conexões</h3>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2">
+          <section className="rounded-lg border border-stone-300 bg-stone-200/45 p-4 flex flex-col gap-3">
+            <div>
+              <h3 className="text-xs uppercase tracking-widest text-parchment/30">Conexões</h3>
+              <p className="text-xs text-parchment/35 mt-1">Associe personagens, lugares e pistas que participam do acontecimento.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
               <select
                 value={linkForm.entity_type}
                 onChange={e => setLinkForm({ entity_type: e.target.value as LinkableType, entity_id: '', role: '' })}
@@ -452,7 +465,7 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
                 placeholder="papel no evento"
                 className="bg-stone-200 border border-stone-300 rounded px-3 py-2 text-sm text-parchment placeholder-parchment/35 focus:outline-none focus:border-gold/60"
               />
-              <Button type="button" size="sm" variant="ghost" onClick={addLocalLink}>
+              <Button type="button" size="sm" onClick={addLocalLink} className="w-full">
                 <Plus size={13} /> Linkar
               </Button>
             </div>
@@ -464,7 +477,11 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
                 const item = (lookup[link.entity_type] ?? []).find(entry => entry.id === link.entity_id)
                 const meta = getEntityMeta(link.entity_type)
                 return (
-                  <div key={`${link.entity_type}:${link.entity_id}`} className="flex items-center justify-between gap-3 rounded-lg border border-stone-300 bg-stone-200 px-3 py-2">
+                  <div
+                    key={`${link.entity_type}:${link.entity_id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-stone-300 bg-stone-200 px-3 py-2"
+                    title={[item ? displayName(link.entity_type, item) : link.entity_id, meta.label, link.role].filter(Boolean).join(' - ')}
+                  >
                     <div className="min-w-0">
                       <p className="text-sm text-parchment truncate">{item ? displayName(link.entity_type, item) : link.entity_id}</p>
                       <p className="text-xs text-parchment/35">{[meta.label, link.role].filter(Boolean).join(' - ')}</p>
@@ -481,12 +498,12 @@ function EventEditorModal({ campaignId, initialSessionId, event, lookup, onClose
                 )
               })}
             </div>
-          </div>
+          </section>
         </div>
 
         {error && <p className="px-5 pb-2 text-sm text-crimson-light">{error.message}</p>}
 
-        <div className="flex justify-end gap-2 border-t border-stone-300 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-stone-300 px-6 py-4 bg-stone-100 shrink-0">
           <Button size="sm" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button size="sm" onClick={submit} loading={pending}>{event ? 'Salvar evento' : 'Criar evento'}</Button>
         </div>

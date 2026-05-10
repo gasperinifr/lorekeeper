@@ -171,6 +171,7 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
         entity_id: entityId,
         name: entityName,
         description: entityDescription,
+        data: entityData,
       })
       setSuggestedLinks(suggestions)
     } catch (err: any) {
@@ -405,11 +406,15 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
             const relationType = relationTypeForDisplay(link.relation_type, link.relation_label)
             const relationLabel = relationDisplayLabel(link.relation_type, link.relation_label)
             const detailText = relationDetailText(link.relation_type, link.relation_label)
+            const fullDescription = [relationLabel, name, meta.label, detailText]
+              .filter(Boolean)
+              .join(' - ')
             return (
-              <div key={link.id} className="flex items-center gap-2 group">
+              <div key={link.id} className="relative flex items-center gap-2 group">
                 <Link
                   to={itemPath(type, item, id)}
                   className="flex items-center gap-2 flex-1 bg-stone-200 hover:bg-stone-300 rounded px-2.5 py-2 transition-colors min-w-0"
+                  title={fullDescription}
                 >
                   <Icon size={13} className={clsx('shrink-0', meta.accentClass)} />
                   <div className="min-w-0">
@@ -426,6 +431,11 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                     </p>
                   </div>
                 </Link>
+                {fullDescription && (
+                  <div className="pointer-events-none absolute left-0 right-6 top-[calc(100%+0.35rem)] z-30 hidden rounded border border-stone-300 bg-stone-100 px-3 py-2 text-xs leading-relaxed text-parchment/75 shadow-xl group-hover:block group-focus-within:block">
+                    {fullDescription}
+                  </div>
+                )}
                 {canEdit && (
                   <button
                     onClick={() => deleteLink.mutate(link.id)}
@@ -440,10 +450,11 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
           })}
 
           {eventLinks.map(link => (
-            <div key={link.id} className="flex items-center gap-2 group">
+            <div key={link.id} className="relative flex items-center gap-2 group">
               <Link
                 to={`/campaigns/${campaignId}/chronicle`}
                 className="flex items-center gap-2 flex-1 bg-stone-200 hover:bg-stone-300 rounded px-2.5 py-2 transition-colors min-w-0"
+                title={[link.role, link.event_title, link.event_date_in_world].filter(Boolean).join(' - ')}
               >
                 <BookMarked size={13} className="shrink-0 text-crimson-light" />
                 <div className="min-w-0">
@@ -458,6 +469,11 @@ export function LinksPanel({ campaignId, entityType, entityId, links, eventLinks
                   </p>
                 </div>
               </Link>
+              {[link.role, link.event_title, link.event_date_in_world].filter(Boolean).length > 0 && (
+                <div className="pointer-events-none absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 hidden rounded border border-stone-300 bg-stone-100 px-3 py-2 text-xs leading-relaxed text-parchment/75 shadow-xl group-hover:block group-focus-within:block">
+                  {[link.role, link.event_title, link.event_date_in_world].filter(Boolean).join(' - ')}
+                </div>
+              )}
             </div>
           ))}
         </div>

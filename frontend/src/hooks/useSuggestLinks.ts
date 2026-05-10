@@ -16,6 +16,7 @@ interface SuggestParams {
   entity_id: string
   name: string
   description?: string
+  data?: Record<string, unknown>
 }
 
 export function useSuggestLinks(campaignId: string) {

@@ -96,6 +96,14 @@ export function PropagationsPanel({
     )
   }
 
+  const toggleSuggestions = () => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    loadSuggestions()
+  }
+
   const visibleSuggestions = useMemo(
     () => suggestions.filter(suggestion => {
       const key = suggestionKey(suggestion)
@@ -129,8 +137,15 @@ export function PropagationsPanel({
 
   return (
     <div className={clsx('relative', popover ? 'shrink-0' : 'mb-4', className)}>
-      <Button type="button" size="sm" onClick={loadSuggestions} loading={suggestPropagations.isPending}>
-        <Sparkles size={13} /> Propagações sugeridas pela IA
+      <Button
+        type="button"
+        size="sm"
+        onClick={toggleSuggestions}
+        loading={suggestPropagations.isPending && !open}
+        className="shrink-0"
+      >
+        {open ? <X size={13} /> : <Sparkles size={13} />}
+        {open ? 'Fechar' : 'Propagações sugeridas pela IA'}
       </Button>
 
       {!open ? null : (
@@ -145,14 +160,6 @@ export function PropagationsPanel({
           <Sparkles size={13} />
           Propagações sugeridas pela IA
         </span>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-parchment/40 hover:text-parchment/70 transition-colors normal-case tracking-normal flex items-center gap-1"
-        >
-          <X size={13} />
-          fechar
-        </button>
       </div>
 
       {!loaded && (

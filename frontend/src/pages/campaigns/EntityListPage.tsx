@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Lock, List, LayoutGrid, ArrowDownAZ } from 'lucide-react'
+import { Plus, Search, BookOpen, Lock, List, LayoutGrid, ArrowDownAZ } from 'lucide-react'
 import { useEntityList } from '@/hooks/useEntities'
 import { useCampaign } from '@/hooks/useCampaign'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
@@ -8,8 +8,6 @@ import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { FiveEBrowser } from '@/components/fiveEtools/FiveEBrowser'
-import { NPCGenerator } from '@/components/ai/NPCGenerator'
-import { EntityAIGenerator } from '@/components/ai/EntityAIGenerator'
 import { EntityListItem } from '@/components/entity/EntityListItem'
 import type { EntityType } from '@/types'
 import { clsx } from 'clsx'
@@ -20,8 +18,6 @@ export function EntityListPage() {
 
   const [search, setSearch] = useState('')
   const [showBrowser, setShowBrowser] = useState(false)
-  const [showAI, setShowAI] = useState(false)
-  const [showEntityAI, setShowEntityAI] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
   const [sortMode, setSortMode] = useState<'name-asc' | 'name-desc' | 'created-desc' | 'created-asc' | 'updated-desc' | 'updated-asc'>('name-asc')
 
@@ -83,17 +79,6 @@ export function EntityListPage() {
           {canEdit && ['creatures', 'spells', 'items'].includes(entityType!) && (
             <Button size="sm" variant="ghost" onClick={() => setShowBrowser(true)}>
               <BookOpen size={14} /> Catálogo 5e
-            </Button>
-          )}
-
-          {canEdit && entityType === 'npcs' && (
-            <Button size="sm" variant="ghost" onClick={() => setShowAI(true)}>
-              <Sparkles size={14} /> Gerar com IA
-            </Button>
-          )}
-          {canEdit && ['creatures', 'items', 'spells'].includes(entityType!) && (
-            <Button size="sm" variant="ghost" onClick={() => setShowEntityAI(true)}>
-              <Sparkles size={14} /> Criar com IA
             </Button>
           )}
 
@@ -258,21 +243,6 @@ export function EntityListPage() {
         />
       )}
 
-      {showAI && (
-        <NPCGenerator
-          campaignId={campaignId!}
-          onClose={() => setShowAI(false)}
-        />
-      )}
-
-      {showEntityAI && entityType && ['creatures', 'items', 'spells'].includes(entityType) && (
-        <EntityAIGenerator
-          campaignId={campaignId!}
-          entityType={entityType as 'creatures' | 'items' | 'spells'}
-          onClose={() => setShowEntityAI(false)}
-          onCreated={entityId => navigate(`/campaigns/${campaignId}/${entityType}/${entityId}`)}
-        />
-      )}
     </div>
   )
 }

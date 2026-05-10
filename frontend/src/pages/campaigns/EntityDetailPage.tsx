@@ -348,14 +348,6 @@ export function EntityDetailPage({ entityTypeOverride }: { entityTypeOverride?: 
               </div>
             )}
 
-            {/* Como encontrar (NPCs) */}
-            {entityType === 'npcs' && entity.data?.hook && (
-              <div>
-                <h3 className="text-xs text-parchment/30 uppercase tracking-widest mb-2">Como encontrar</h3>
-                <Prose text={entity.data.hook} />
-              </div>
-            )}
-
             {isGroup && groupEntity && (
               <GroupMembersSection
                 campaignId={campaignId!}

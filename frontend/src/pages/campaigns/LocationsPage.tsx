@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight, Map, Sparkles, Lock, List, LayoutGrid, Search, ArrowDownAZ } from 'lucide-react'
+import { Plus, ChevronRight, Map, Lock, List, LayoutGrid, Search, ArrowDownAZ } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useEntityList } from '@/hooks/useEntities'
 import { useCampaign } from '@/hooks/useCampaign'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { LocationGenerator } from '@/components/ai/LocationGenerator'
 import { EntityListItem } from '@/components/entity/EntityListItem'
 import { ENTITY_CONFIG } from '@/config/entityConfig'
 import { clsx } from 'clsx'
@@ -140,7 +139,6 @@ export function LocationsPage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const [view, setView] = useState<'list' | 'tree'>('list')
-  const [showAI, setShowAI] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'gallery'>('list')
   const [search, setSearch] = useState('')
   const [sortMode, setSortMode] = useState<LocationSortMode>('name-asc')
@@ -182,12 +180,6 @@ export function LocationsPage() {
           {list && <span className="text-parchment/30 text-sm">{list.length}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && (
-            <Button size="sm" variant="ghost" onClick={() => setShowAI(true)}>
-              <Sparkles size={14} /> Gerar com IA
-            </Button>
-          )}
-
           {view === 'list' && (
             <div className="h-8 rounded border border-stone-300 bg-stone-100 p-0.5 flex items-center">
               <button
@@ -338,12 +330,6 @@ export function LocationsPage() {
         </div>
       )}
 
-      {showAI && (
-        <LocationGenerator
-          campaignId={campaignId!}
-          onClose={() => setShowAI(false)}
-        />
-      )}
     </div>
   )
 }

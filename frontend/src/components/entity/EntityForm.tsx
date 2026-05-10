@@ -555,6 +555,28 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
     return payload
   }
 
+  const buildSuggestionContext = (payload: Record<string, any>) => {
+    const context: Record<string, unknown> = {}
+    for (const key of [
+      'backstory',
+      'content',
+      'personality',
+      'secrets',
+      'properties',
+      'headquarters',
+      'motto',
+      'role',
+      'race',
+      'class',
+      'type',
+      'rarity',
+    ]) {
+      if (payload[key]) context[key] = payload[key]
+    }
+    if (payload.data && typeof payload.data === 'object') context.data = payload.data
+    return context
+  }
+
   const saveEntity = async () => {
     setError('')
     const payload = buildPayload()
@@ -643,12 +665,14 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
       const result = await saveEntity()
       let linkSuggestions: any[] = []
       if (!isEdit) {
+        const payload = buildPayload()
         try {
           linkSuggestions = await suggestLinks.suggest({
             entity_type: type,
             entity_id: result.id,
             name: result.name ?? result.title ?? form.name ?? '',
             description: result.description ?? form.description,
+            data: buildSuggestionContext(payload),
           })
         } catch {
           linkSuggestions = []
@@ -1014,22 +1038,6 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
         ))}
 
         <Structured5eEditor type={type} data={structuredData} setData={setData} />
-
-        {type === 'npcs' && (
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-parchment/70 font-medium">
-              Como encontrar
-              <span className="text-parchment/30 font-normal ml-2 text-xs"></span>
-            </label>
-            <textarea
-              value={form.data?.hook ?? ''}
-              onChange={e => setData('hook', e.target.value)}
-              rows={3}
-              placeholder="Onde e como o grupo pode encontrar ou conhecer este NPC..."
-              className={clsx(inputClass, 'resize-y')}
-            />
-          </div>
-        )}
 
         {!isEdit && (
           <PendingConnectionsEditor
