@@ -28,6 +28,16 @@ export async function aiRoutes(fastify) {
     throw new Error('Falha ao parsear resposta da IA.')
   }
 
+  function compactAI(value, max = 900) {
+    const text = typeof value === 'string'
+      ? value
+      : value && typeof value === 'object'
+      ? JSON.stringify(value)
+      : ''
+    const clean = text.replace(/\s+/g, ' ').trim()
+    return clean.length > max ? `${clean.slice(0, max - 1)}...` : clean
+  }
+
   async function getCampaignContext(campaignId) {
     const [camp, npcs, locs, chars, groups] = await Promise.all([
       db.query('SELECT title,description,scenario_type FROM campaigns WHERE id=$1', [campaignId]),
@@ -187,6 +197,14 @@ REGRAS TÉCNICAS 5e:
 - Priorize termos de regra do SRD 5e.
 - Escreva todos os textos mecânicos em português brasileiro com acentos. Evite português literal/truncado.
 `
+      const PRIVACY_RULES = `
+REGRAS DE PRIVACIDADE E CONEXOES:
+- Voce pode usar entidades existentes da campanha para enriquecer o rascunho.
+- Informacoes que jogadores podem ver podem ficar em description, backstory, content, properties, history, culture, appearance e campos equivalentes.
+- Segredos, revelacoes futuras, traicoes, maldicoes ocultas, notas de bastidor e ganchos de mestre devem ficar apenas em secrets, data.dm_notes, data.plot_hook ou data.curse.
+- Se mencionar uma entidade existente em campo publico, mencione apenas o que seria seguro para jogadores saberem.
+- Se a conexao com uma entidade existente for secreta, mantenha o detalhe em campo privado para que o sistema possa sugerir a conexao sem vazar a revelacao.
+`
       const PROMPTS = {
         characters: `Crie um rascunho para o personagem de jogador chamado "${subject}".${direction}${existingInstruction}
 REGRAS ESPECÍFICAS PARA PERSONAGEM:
@@ -240,7 +258,7 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
       const prompt = PROMPTS[entity_type]
       if (!prompt) return reply.status(400).send({ error: `Tipo não suportado: ${entity_type}` })
 
-      const text = await complete(SYSTEM, `${ctx}\n\n${prompt}`, 900)
+      const text = await complete(SYSTEM, `${ctx}\n\n${PRIVACY_RULES}\n${prompt}`, 900)
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar rascunho de entidade')
@@ -250,14 +268,14 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
 
   fastify.post('/campaigns/:campaignId/ai/suggest-links', { preHandler: requireEditor }, async (req, reply) => {
     try {
-      const { entity_type, entity_id, name, description } = req.body
+      const { entity_type, entity_id, name, description, data: entityData } = req.body
 
       const [chars, npcs, locs, items, groups] = await Promise.all([
-        db.query('SELECT id,name FROM characters WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name FROM npcs WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name,type FROM locations WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name FROM items WHERE campaign_id=$1 LIMIT 20', [req.params.campaignId]),
-        db.query('SELECT id,name,type FROM groups WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
+        db.query('SELECT id,name,race,class,LEFT(description,120) AS description FROM characters WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
+        db.query('SELECT id,name,role,race,LEFT(description,120) AS description FROM npcs WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
+        db.query('SELECT id,name,type,LEFT(description,120) AS description FROM locations WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
+        db.query('SELECT id,name,type,rarity,LEFT(description,120) AS description FROM items WHERE campaign_id=$1 LIMIT 20', [req.params.campaignId]),
+        db.query('SELECT id,name,type,LEFT(description,120) AS description FROM groups WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
       ])
 
       const allEntities = [
@@ -270,22 +288,30 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
 
       if (!allEntities.length) return reply.send({ suggestions: [] })
 
-      const entityList = allEntities.map(e => `[${e.type}/${e.id}] ${e.name}`).join('\n')
-      const text = await complete(SYSTEM,
-        `Nova entidade criada: ${entity_type} chamado(a) "${name}".
-Descricao: ${description ?? '(sem descricao)'}
-
+  const entityList = allEntities.map(e => {
+    const meta = [e.role, e.race, e.class, e.type, e.rarity].filter(Boolean).join(', ')
+    return `[${e.type}/${e.id}] ${e.name}${meta ? ` (${meta})` : ''}${e.description ? `: ${e.description}` : ''}`
+  }).join('\n')
+  const sourceContext = [
+    description ? `Descricao: ${compactAI(description, 900)}` : 'Descricao: (sem descricao)',
+    entityData ? `Dados adicionais: ${compactAI(entityData, 1600)}` : '',
+  ].filter(Boolean).join('\n')
+  const text = await complete(SYSTEM,
+    `Nova entidade criada: ${entity_type} chamado(a) "${name}".
+${sourceContext}
 Entidades existentes na campanha:
 ${entityList}
-
-Identifique até 3 conexões que fazem sentido narrativo entre a nova entidade e as existentes.
+Identifique ate 5 conexoes que fazem sentido narrativo entre a nova entidade e as existentes.
+Use os nomes citados no rascunho, descricao e dados adicionais como forte evidencia de conexao.
+Nao sugira a mesma entidade mais de uma vez. Se houver mais de uma relacao com a mesma entidade, escolha a relacao mais importante e resuma as demais na relation_label.
+Se a evidencia vier de segredo, notas de DM, maldicao, gancho oculto ou outro dado privado, use relation_type "segredo" e escreva uma relation_label segura para jogadores, sem revelar o segredo.
 Retorne JSON:
 {"suggestions":[{"target_id":"uuid-sem-prefixo","target_type":"characters|npcs|locations|items|groups","relation_type":"alianca|rivalidade|familia|lealdade|segredo|divida|amor|amizade|parceria|posse|membro|localizacao|protecao|subordinacao|mentor|neutro|outro","relation_label":"descricao curta da relacao","confidence":0.0-1.0}]}
 Use exatamente um dos ids listados. Nao invente ids, nao use nomes como id e nao inclua prefixos como "npcs/" dentro de target_id.
 Use "outro" apenas quando nenhum tipo existente representar a relacao. Use "rivalidade" para inimizade, odio ou hostilidade.
 Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
-        600
-      )
+1200
+)
       let parsed
       try {
         parsed = parseJSON(text)
@@ -293,24 +319,29 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
         req.log.warn({ err: parseErr, text }, 'Resposta inválida da IA ao sugerir links')
         return reply.send({ suggestions: [] })
       }
-      const suggestions = (parsed.suggestions ?? [])
-        .filter(s => Number(s.confidence ?? 0) >= 0.6)
-        .map(s => {
-          const { targetType, targetId } = normalizeSuggestedTarget(s)
-          const target = allEntities.find(e => e.id === targetId && e.type === targetType)
-          if (!target) return null
-          const relationType = normalizeRelationType(s.relation_type, s.relation_label)
-          return {
-            target_id: target.id,
-            target_type: target.type,
-            target_name: target.name,
-            relation_type: relationType,
-            relation_label: s.relation_label,
-            confidence: Number(s.confidence ?? 0),
-          }
-        })
-        .filter(Boolean)
-        .slice(0, 3)
+      const suggestionsByTarget = new Map()
+      for (const suggestion of parsed.suggestions ?? []) {
+        const { targetType, targetId } = normalizeSuggestedTarget(suggestion)
+        const target = allEntities.find(e => e.id === targetId && e.type === targetType)
+        if (!target) continue
+        const normalized = {
+          target_id: target.id,
+          target_type: target.type,
+          target_name: target.name,
+          relation_type: normalizeRelationType(suggestion.relation_type, suggestion.relation_label),
+          relation_label: compactAI(suggestion.relation_label, 100) || undefined,
+          confidence: Number(suggestion.confidence ?? 0),
+        }
+        if (normalized.confidence < 0.6) continue
+        const key = `${target.type}:${target.id}`
+        const previous = suggestionsByTarget.get(key)
+        if (!previous || normalized.confidence > previous.confidence) {
+          suggestionsByTarget.set(key, normalized)
+        }
+      }
+      const suggestions = [...suggestionsByTarget.values()]
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5)
       return reply.send({ suggestions })
     } catch (err) {
       req.log.error({ err }, 'Falha ao sugerir links')
@@ -326,39 +357,39 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
         return reply.status(400).send({ error: 'entity_type, entity_id e name são obrigatórios.' })
       }
 
-      const emptyId = '00000000-0000-0000-0000-000000000000'
-      const [npcs, locations, items, characters, notes] = await Promise.all([
-        db.query(
-          `SELECT id, name, role, race, is_alive, description, data FROM npcs
-           WHERE campaign_id=$1 AND id != $2
-           ORDER BY updated_at DESC LIMIT 30`,
-          [req.params.campaignId, entity_type === 'npcs' ? entity_id : emptyId]
-        ),
-        db.query(
-          `SELECT id, name, type, description, data FROM locations
-           WHERE campaign_id=$1 AND id != $2
-           ORDER BY updated_at DESC LIMIT 20`,
-          [req.params.campaignId, entity_type === 'locations' ? entity_id : emptyId]
-        ),
-        db.query(
-          `SELECT id, name, type, description, data FROM items
-           WHERE campaign_id=$1 AND id != $2
-           ORDER BY updated_at DESC LIMIT 20`,
-          [req.params.campaignId, entity_type === 'items' ? entity_id : emptyId]
-        ),
-        db.query(
-          `SELECT id, name, race, class, description, backstory FROM characters
-           WHERE campaign_id=$1 AND id != $2
-           ORDER BY name ASC`,
-          [req.params.campaignId, entity_type === 'characters' ? entity_id : emptyId]
-        ),
-        db.query(
-          `SELECT id, title, content FROM notes
-           WHERE campaign_id=$1 AND id != $2
-           ORDER BY updated_at DESC LIMIT 15`,
-          [req.params.campaignId, entity_type === 'notes' ? entity_id : emptyId]
-        ),
-      ])
+  const emptyId = '00000000-0000-0000-0000-000000000000'
+  const [npcs, locations, items, characters, notes] = await Promise.all([
+    db.query(
+      `SELECT id, name, role, race, is_alive, LEFT(description, 80) AS description FROM npcs
+       WHERE campaign_id=$1 AND id != $2
+       ORDER BY updated_at DESC LIMIT 30`,
+      [req.params.campaignId, entity_type === 'npcs' ? entity_id : emptyId]
+    ),
+    db.query(
+      `SELECT id, name, type, LEFT(description, 80) AS description FROM locations
+       WHERE campaign_id=$1 AND id != $2
+       ORDER BY updated_at DESC LIMIT 20`,
+      [req.params.campaignId, entity_type === 'locations' ? entity_id : emptyId]
+    ),
+    db.query(
+      `SELECT id, name, type, LEFT(description, 80) AS description FROM items
+       WHERE campaign_id=$1 AND id != $2
+       ORDER BY updated_at DESC LIMIT 20`,
+      [req.params.campaignId, entity_type === 'items' ? entity_id : emptyId]
+    ),
+    db.query(
+      `SELECT id, name, race, class, LEFT(description, 80) AS description FROM characters
+       WHERE campaign_id=$1 AND id != $2
+       ORDER BY name ASC`,
+      [req.params.campaignId, entity_type === 'characters' ? entity_id : emptyId]
+    ),
+    db.query(
+      `SELECT id, title, LEFT(content, 80) AS content FROM notes
+       WHERE campaign_id=$1 AND id != $2
+       ORDER BY updated_at DESC LIMIT 15`,
+      [req.params.campaignId, entity_type === 'notes' ? entity_id : emptyId]
+    ),
+  ])
 
       const ctx = `
 NPCs: ${npcs.rows.map(r => `[id:${r.id}] ${r.name} (${r.role ?? 'sem papel'}, ${r.race ?? ''}, ${r.is_alive === false ? 'morto' : 'vivo'})${r.description ? ': ' + r.description.slice(0, 150) : ''}`).join('\n') || 'nenhum'}
@@ -368,19 +399,27 @@ Personagens: ${characters.rows.map(r => `[id:${r.id}] ${r.name} (${r.race ?? ''}
 Notas: ${notes.rows.map(r => `[id:${r.id}] ${r.title}${r.content ? ': ' + r.content.slice(0, 100) : ''}`).join('\n') || 'nenhuma'}
       `.trim()
 
-      const entityDesc = description ? description.slice(0, 400) : ''
-      const entityDataStr = entityData && typeof entityData === 'object' ? JSON.stringify(entityData).slice(0, 300) : ''
+  const entityDesc = description ? description.slice(0, 400) : ''
+  const entityDataStr = entityData && typeof entityData === 'object' ? JSON.stringify(entityData).slice(0, 300) : ''
+  const targetLookup = new Map([
+    ...npcs.rows.map(r => [`npcs:${r.id}`, { type: 'npcs', id: r.id, name: r.name }]),
+    ...locations.rows.map(r => [`locations:${r.id}`, { type: 'locations', id: r.id, name: r.name }]),
+    ...items.rows.map(r => [`items:${r.id}`, { type: 'items', id: r.id, name: r.name }]),
+    ...characters.rows.map(r => [`characters:${r.id}`, { type: 'characters', id: r.id, name: r.name }]),
+  ])
 
-      const text = await complete(
-        `Você é um assistente especialista em narrativa de RPG que analisa entidades e sugere propagações de estado coerentes no mundo da campanha.
+  const text = await complete(
+    `Você é um assistente especialista em narrativa de RPG que analisa entidades e sugere propagações de estado coerentes no mundo da campanha.
 REGRAS OBRIGATÓRIAS:
-- Responda SOMENTE com JSON válido, sem texto antes ou depois, sem blocos de código
-- Sugira apenas propagações que fazem sentido narrativo real e direto
-- Nunca invente conexões forçadas
-- Para is_alive use apenas true ou false (boolean)
-- Máximo 4 sugestões por chamada
-- Só sugira propagações para entidades cujo id aparece na lista de contexto`,
-        `Entidade recém criada/editada:
+
+Responda SOMENTE com JSON válido, sem texto antes ou depois, sem blocos de código
+Sugira apenas propagações que fazem sentido narrativo real e direto
+Nunca invente conexões forçadas
+Para is_alive use apenas true ou false (boolean)
+Máximo 4 sugestões por chamada
+Só sugira propagações para entidades cujo id aparece na lista de contexto
+Responda com um único objeto JSON no formato {"propagations":[]}`,
+    `Entidade recém criada/editada:
 Tipo: ${entity_type}
 ID: ${entity_id}
 Nome: "${name}"
@@ -391,7 +430,6 @@ Entidades existentes na campanha:
 ${ctx}
 
 Com base no nome, descrição e dados da entidade recém criada, identifique propagações de estado que deveriam acontecer em outras entidades já existentes.
-
 Retorne JSON:
 {
   "propagations": [
@@ -405,13 +443,21 @@ Retorne JSON:
     }
   ]
 }
-
 Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
-        700
-      )
+    1200
+  )
 
-      const parsed = parseJSON(text)
-      const propagations = Array.isArray(parsed?.propagations) ? parsed.propagations : []
+      let parsed
+      try {
+        parsed = parseJSON(text)
+      } catch (parseErr) {
+        req.log.warn({ err: parseErr, text }, 'Resposta inválida da IA ao sugerir propagações')
+        return reply.send({ propagations: [] })
+      }
+      const propagations = (Array.isArray(parsed?.propagations) ? parsed.propagations : [])
+        .map(propagation => normalizePropagationSuggestion(propagation, targetLookup))
+        .filter(Boolean)
+        .slice(0, 4)
 
       return reply.send({ propagations })
     } catch (err) {
@@ -522,6 +568,49 @@ Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
     if (/(prote[çc]|guard|defend)/i.test(relationText)) return 'protecao'
     if (/(subordin|comanda|lidera|servo|vassal|chefe)/i.test(relationText)) return 'subordinacao'
     return LINK_RELATION_TYPES.includes(raw) ? raw : 'outro'
+  }
+
+  function normalizePropagationSuggestion(propagation, targetLookup) {
+    if (!propagation || typeof propagation !== 'object') return null
+    const targetType = LINK_TYPE_ALIASES[String(propagation.target_type ?? '').trim().toLowerCase()]
+      ?? String(propagation.target_type ?? '').trim().toLowerCase()
+    const targetId = String(propagation.target_id ?? '').trim()
+    const target = targetLookup.get(`${targetType}:${targetId}`)
+    if (!target) return null
+
+    const field = String(propagation.field ?? '').trim()
+    const allowedFields = {
+      npcs: ['is_alive', 'role', 'description', 'data'],
+      locations: ['description', 'data'],
+      items: ['description', 'data'],
+      characters: ['description', 'is_active', 'data'],
+    }[targetType]
+    if (!allowedFields) return null
+
+    const rootField = field.split('.')[0]
+    if (!allowedFields.includes(rootField)) return null
+    if (field.startsWith('data.') && !/^data\.[\w-]+(?:\.[\w-]+)*$/.test(field)) return null
+    if (!field.startsWith('data.') && field.includes('.')) return null
+
+    let value = propagation.value
+    if (field === 'is_alive' || field === 'is_active') {
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        if (['true', 'vivo', 'ativa', 'ativo', 'sim'].includes(normalized)) value = true
+        if (['false', 'morto', 'morta', 'inativa', 'inativo', 'nao', 'não'].includes(normalized)) value = false
+      }
+      if (typeof value !== 'boolean') return null
+    }
+    if (value === undefined) return null
+
+    return {
+      target_type: target.type,
+      target_id: target.id,
+      target_name: String(propagation.target_name ?? target.name),
+      field,
+      value,
+      reason: String(propagation.reason ?? '').trim() || 'Propagação sugerida pela IA.',
+    }
   }
 
   function oracleSystemPrompt(context, mode) {

@@ -1,31 +1,54 @@
 import Groq from 'groq-sdk'
 
-const model = process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile'
-let groq
+// ─── Configuração dos dois agentes Groq ──────────────────────────────────────
 
-function getGroq() {
+const PRIMARY_MODEL   = process.env.GROQ_MODEL   ?? 'openai/gpt-oss-120b'
+const SECONDARY_MODEL = process.env.GROQ_MODEL_2 ?? 'llama-3.3-70b-versatile'
+
+let _groqPrimary
+let _groqSecondary
+
+function getGroqPrimary() {
   if (!process.env.GROQ_API_KEY) {
-    throw new Error('Groq não configurado: defina GROQ_API_KEY.')
+    throw new Error('GROQ_API_KEY não configurada.')
   }
-
-  if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  return groq
+  if (!_groqPrimary) {
+    _groqPrimary = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  }
+  return _groqPrimary
 }
 
-export async function complete(systemPrompt, userPrompt, maxTokens = 1000) {
-  const msg = await getGroq().chat.completions.create({
-    model,
-    max_tokens: maxTokens,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-  })
-  return msg.choices[0].message.content
+function getGroqSecondary() {
+  if (!_groqSecondary) {
+    const key = process.env.GROQ_API_KEY_2 ?? process.env.GROQ_API_KEY
+    if (!key) throw new Error('Nenhuma chave Groq configurada.')
+    _groqSecondary = new Groq({ apiKey: key })
+  }
+  return _groqSecondary
 }
 
-export async function completeMessages(systemPrompt, messages, maxTokens = 1200) {
-  const msg = await getGroq().chat.completions.create({
+// ─── Detecção de erros recuperáveis ──────────────────────────────────────────
+
+function isRecoverableError(err) {
+  const status = err?.status ?? err?.statusCode ?? err?.response?.status
+  if (status === 429) return true
+  if (status === 500) return true
+  if (status === 503) return true
+  const msg = String(err?.message ?? '').toLowerCase()
+  if (msg.includes('timeout'))            return true
+  if (msg.includes('rate_limit'))         return true
+  if (msg.includes('rate limit'))         return true
+  if (msg.includes('too many requests'))  return true
+  if (msg.includes('econnrefused'))       return true
+  if (msg.includes('econnreset'))         return true
+  if (msg.includes('fetch failed'))       return true
+  return false
+}
+
+// ─── Chamada bruta Groq ──────────────────────────────────────────────────────
+
+async function callGroq(client, model, systemPrompt, messages, maxTokens) {
+  const msg = await client.chat.completions.create({
     model,
     max_tokens: maxTokens,
     messages: [
@@ -35,6 +58,68 @@ export async function completeMessages(systemPrompt, messages, maxTokens = 1200)
   })
   return msg.choices[0].message.content
 }
+
+function validateContent(content, path) {
+  if (typeof content === 'string' || Array.isArray(content)) return
+  throw new TypeError(`${path} deve ser string ou array de partes de mensagem.`)
+}
+
+function validateMessages(systemPrompt, messages, maxTokens) {
+  validateContent(systemPrompt, 'systemPrompt')
+  if (!Array.isArray(messages)) {
+    throw new TypeError('messages deve ser um array.')
+  }
+  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+    throw new TypeError('maxTokens deve ser um inteiro positivo.')
+  }
+  for (const [index, message] of messages.entries()) {
+    if (!message || typeof message !== 'object') {
+      throw new TypeError(`messages.${index} deve ser um objeto.`)
+    }
+    if (!['assistant', 'user'].includes(message.role)) {
+      throw new TypeError(`messages.${index}.role invalido: ${message.role}`)
+    }
+    validateContent(message.content, `messages.${index}.content`)
+  }
+}
+
+// ─── Wrapper com fallback ────────────────────────────────────────────────────
+
+async function completeWithFallback(systemPrompt, messages, maxTokens) {
+  validateMessages(systemPrompt, messages, maxTokens)
+
+  try {
+    return await callGroq(getGroqPrimary(), PRIMARY_MODEL, systemPrompt, messages, maxTokens)
+  } catch (primaryErr) {
+    if (!isRecoverableError(primaryErr)) throw primaryErr
+    console.warn(`[ai] Chave primária falhou (${primaryErr?.status ?? primaryErr?.message}). Tentando chave secundária...`)
+  }
+
+  try {
+    const result = await callGroq(getGroqSecondary(), SECONDARY_MODEL, systemPrompt, messages, maxTokens)
+    console.info('[ai] Chave secundária respondeu com sucesso.')
+    return result
+  } catch (secondaryErr) {
+    console.error('[ai] Ambas as chaves falharam.', { secondary: secondaryErr?.message })
+    throw secondaryErr
+  }
+}
+
+// ─── API pública ─────────────────────────────────────────────────────────────
+
+export async function complete(systemPrompt, userPrompt, maxTokens = 1000) {
+  return completeWithFallback(
+    systemPrompt,
+    [{ role: 'user', content: userPrompt }],
+    maxTokens
+  )
+}
+
+export async function completeMessages(systemPrompt, messages, maxTokens = 1200) {
+  return completeWithFallback(systemPrompt, messages, maxTokens)
+}
+
+// ─── Utilitários internos ─────────────────────────────────────────────────────
 
 function compact(text, max = 420) {
   const value = String(text ?? '').replace(/\s+/g, ' ').trim()
@@ -77,6 +162,8 @@ function citationLine(label, type) {
   const value = compact(label, 120)
   return value ? `- @${value} | ${type}` : null
 }
+
+// ─── Contexto completo da campanha ───────────────────────────────────────────
 
 export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
   const safeMode = mode === 'player' ? 'player' : 'dm'
@@ -123,8 +210,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
     db.query(
       `SELECT id,name,race,class,level,description,backstory,is_alive,is_active,data FROM characters
        WHERE campaign_id=$1 ${visibilityFilter(safeMode)}
-       ORDER BY name ASC
-      `,
+       ORDER BY name ASC`,
       [campaignId]
     ),
     db.query(
@@ -200,16 +286,17 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
   const c = campaign.rows[0] ?? {}
   const nameMaps = {
     characters: new Map(characters.rows.map(r => [r.id, r.name])),
-    npcs: new Map(npcs.rows.map(r => [r.id, r.name])),
-    locations: new Map(locations.rows.map(r => [r.id, r.name])),
-    items: new Map(items.rows.map(r => [r.id, r.name])),
-    spells: new Map(spells.rows.map(r => [r.id, r.name])),
-    creatures: new Map(creatures.rows.map(r => [r.id, r.name])),
-    notes: new Map(notes.rows.map(r => [r.id, r.title])),
-    arcs: new Map(arcs.rows.map(r => [r.id, r.title])),
-    sessions: new Map(sessions.rows.map(r => [r.id, r.title])),
-    groups: new Map(groups.rows.map(r => [r.id, r.name])),
+    npcs:       new Map(npcs.rows.map(r => [r.id, r.name])),
+    locations:  new Map(locations.rows.map(r => [r.id, r.name])),
+    items:      new Map(items.rows.map(r => [r.id, r.name])),
+    spells:     new Map(spells.rows.map(r => [r.id, r.name])),
+    creatures:  new Map(creatures.rows.map(r => [r.id, r.name])),
+    notes:      new Map(notes.rows.map(r => [r.id, r.title])),
+    arcs:       new Map(arcs.rows.map(r => [r.id, r.title])),
+    sessions:   new Map(sessions.rows.map(r => [r.id, r.title])),
+    groups:     new Map(groups.rows.map(r => [r.id, r.name])),
   }
+
   const { rows: entityLinks } = await db.query(
     `SELECT source_type, source_id, target_type, target_id, relation_label
      FROM entity_links
@@ -234,30 +321,30 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       `SELECT l.event_id, l.entity_type, l.role,
               COALESCE(ch.name, npc.name, loc.name, item.name, spell.name, creature.name, note.title, arc.title, session.title, grp.name) AS entity_name
        FROM event_entity_links l
-       LEFT JOIN characters ch ON l.entity_type='characters' AND ch.id=l.entity_id
-       LEFT JOIN npcs npc ON l.entity_type='npcs' AND npc.id=l.entity_id
-       LEFT JOIN locations loc ON l.entity_type='locations' AND loc.id=l.entity_id
-       LEFT JOIN items item ON l.entity_type='items' AND item.id=l.entity_id
-       LEFT JOIN spells spell ON l.entity_type='spells' AND spell.id=l.entity_id
-       LEFT JOIN creatures creature ON l.entity_type='creatures' AND creature.id=l.entity_id
-       LEFT JOIN notes note ON l.entity_type='notes' AND note.id=l.entity_id
-       LEFT JOIN arcs arc ON l.entity_type='arcs' AND arc.id=l.entity_id
-       LEFT JOIN sessions session ON l.entity_type='sessions' AND session.id=l.entity_id
-       LEFT JOIN groups grp ON l.entity_type='groups' AND grp.id=l.entity_id
+       LEFT JOIN characters ch       ON l.entity_type='characters' AND ch.id=l.entity_id
+       LEFT JOIN npcs npc             ON l.entity_type='npcs'       AND npc.id=l.entity_id
+       LEFT JOIN locations loc        ON l.entity_type='locations'  AND loc.id=l.entity_id
+       LEFT JOIN items item           ON l.entity_type='items'      AND item.id=l.entity_id
+       LEFT JOIN spells spell         ON l.entity_type='spells'     AND spell.id=l.entity_id
+       LEFT JOIN creatures creature   ON l.entity_type='creatures'  AND creature.id=l.entity_id
+       LEFT JOIN notes note           ON l.entity_type='notes'      AND note.id=l.entity_id
+       LEFT JOIN arcs arc             ON l.entity_type='arcs'       AND arc.id=l.entity_id
+       LEFT JOIN sessions session     ON l.entity_type='sessions'   AND session.id=l.entity_id
+       LEFT JOIN groups grp           ON l.entity_type='groups'     AND grp.id=l.entity_id
        WHERE l.event_id = ANY($1)
          AND (
            $2::boolean = false OR
            CASE l.entity_type
              WHEN 'characters' THEN COALESCE(ch.visibility='public', false)
-             WHEN 'npcs' THEN COALESCE(npc.visibility='public', false)
-             WHEN 'locations' THEN COALESCE(loc.visibility='public', false)
-             WHEN 'items' THEN COALESCE(item.visibility='public', false)
-             WHEN 'spells' THEN COALESCE(spell.visibility='public', false)
-             WHEN 'creatures' THEN COALESCE(creature.visibility='public', false)
-             WHEN 'notes' THEN COALESCE(note.visibility='public' AND note.is_secret=false, false)
-             WHEN 'arcs' THEN COALESCE(arc.visibility='public', false)
-             WHEN 'sessions' THEN COALESCE(session.visibility='public', false)
-             WHEN 'groups' THEN COALESCE(grp.visibility='public', false)
+             WHEN 'npcs'       THEN COALESCE(npc.visibility='public', false)
+             WHEN 'locations'  THEN COALESCE(loc.visibility='public', false)
+             WHEN 'items'      THEN COALESCE(item.visibility='public', false)
+             WHEN 'spells'     THEN COALESCE(spell.visibility='public', false)
+             WHEN 'creatures'  THEN COALESCE(creature.visibility='public', false)
+             WHEN 'notes'      THEN COALESCE(note.visibility='public' AND note.is_secret=false, false)
+             WHEN 'arcs'       THEN COALESCE(arc.visibility='public', false)
+             WHEN 'sessions'   THEN COALESCE(session.visibility='public', false)
+             WHEN 'groups'     THEN COALESCE(grp.visibility='public', false)
              ELSE false
            END
          )
@@ -265,6 +352,7 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       [eventIds, publicOnly]
     )
     : { rows: [] }
+
   const linksByEvent = new Map()
   for (const link of eventLinks.rows) {
     if (!link.entity_name) continue
@@ -322,9 +410,9 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       events.rows,
       r => {
         const session = r.session_title ? ` [sessão: ${r.session_title}]` : ''
-        const date = r.date_in_world ? ` | ${r.date_in_world}` : ''
-        const impact = { divisor: 'DIVISOR', significativo: 'Significativo', menor: 'Menor' }[r.impact] ?? r.impact
-        const linked = linksByEvent.get(r.id)?.length ? ` Ligado a: ${linksByEvent.get(r.id).join(', ')}.` : ''
+        const date    = r.date_in_world ? ` | ${r.date_in_world}` : ''
+        const impact  = { divisor: 'DIVISOR', significativo: 'Significativo', menor: 'Menor' }[r.impact] ?? r.impact
+        const linked  = linksByEvent.get(r.id)?.length ? ` Ligado a: ${linksByEvent.get(r.id).join(', ')}.` : ''
         return `- ${impact} | ${r.type.toUpperCase()} | ${r.title}${session}${date}${r.description ? `: ${compact(r.description, 200)}` : ''}${linked}`
       }
     ),
@@ -334,8 +422,8 @@ export async function getCampaignContextFull(db, campaignId, mode = 'dm') {
       groups.rows,
       r => {
         const members = Number(r.member_count) > 0 ? ` | ${r.member_count} membro(s)` : ''
-        const hq = r.headquarters ? ` | Sede: ${compact(r.headquarters, 80)}` : ''
-        const motto = r.motto ? ` | Lema: "${compact(r.motto, 80)}"` : ''
+        const hq      = r.headquarters ? ` | Sede: ${compact(r.headquarters, 80)}` : ''
+        const motto   = r.motto ? ` | Lema: "${compact(r.motto, 80)}"` : ''
         const secrets = r.secrets ? ` | Segredos: ${compact(r.secrets, 160)}` : ''
         return `- ${r.name}${r.type ? ` (${r.type})` : ''}${members}${hq}${motto}${r.description ? `: ${compact(r.description, 200)}` : ''}${secrets}`
       }

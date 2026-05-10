@@ -188,6 +188,7 @@ export async function canReadLinkable(db, req, type, id, campaignId = req.params
 export async function filterVisibleLinks(db, req, links, campaignId = req.params.campaignId) {
   const visible = []
   for (const link of links) {
+    if (!canViewDm(req) && link.relation_type === 'segredo') continue
     const [sourceVisible, targetVisible] = await Promise.all([
       canReadLinkable(db, req, link.source_type, link.source_id, campaignId),
       canReadLinkable(db, req, link.target_type, link.target_id, campaignId),
