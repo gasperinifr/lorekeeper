@@ -488,7 +488,7 @@ export function RelationshipGraphPage() {
                         navigate(node.path)
                       }}
                     >
-                      <circle className="graph-node-circle" r={15} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.4} />
+                      <circle className="graph-node-circle" r={20} fill={`${node.color}22`} stroke={node.color} strokeWidth={1.2} />
                       <foreignObject x={-8} y={-8} width={16} height={16} className="pointer-events-none">
                         <Icon size={16} color={node.color} />
                       </foreignObject>
