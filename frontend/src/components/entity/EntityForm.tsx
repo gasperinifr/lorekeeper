@@ -654,8 +654,8 @@ export function EntityForm({ campaignId, type, initial, entityId }: Props) {
         data: buildPayload(),
       })
       applyDraft(result)
-    } catch {
-      setDraftError('Não foi possível gerar o rascunho agora.')
+    } catch (err: any) {
+      setDraftError(err?.message ?? 'Não foi possível gerar o rascunho agora.')
     }
   }
 

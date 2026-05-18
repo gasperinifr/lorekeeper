@@ -1,5 +1,5 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
-import { complete, completeMessages, getCampaignContextFull } from '../lib/ai.js'
+import { complete, completeJSON, completeMessages, getCampaignContextFull } from '../lib/ai.js'
 import { canViewDm } from '../lib/audience.js'
 import { cache, cacheKey } from '../lib/cache.js'
 
@@ -30,8 +30,12 @@ export async function aiRoutes(fastify) {
   }
 
   function parseJSON(text) {
-    try { return JSON.parse(text) } catch {}
-    const match = text.match(/\{[\s\S]*\}/)
+    const clean = String(text ?? '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim()
+    try { return JSON.parse(clean) } catch {}
+    const match = clean.match(/\{[\s\S]*\}/)
     if (match) { try { return JSON.parse(match[0]) } catch {} }
     throw new Error('Falha ao parsear resposta da IA.')
   }
@@ -46,15 +50,186 @@ export async function aiRoutes(fastify) {
     return clean.length > max ? `${clean.slice(0, max - 1)}...` : clean
   }
 
+  function withExisting(existing, generated) {
+    const result = { ...generated }
+    if (!existing || typeof existing !== 'object') return result
+    for (const [key, value] of Object.entries(existing)) {
+      if (value === undefined || value === null || value === '') continue
+      if (key === 'data' && value && typeof value === 'object' && !Array.isArray(value)) {
+        result.data = { ...(generated.data ?? {}), ...value }
+      } else {
+        result[key] = value
+      }
+    }
+    return result
+  }
+
+  function fallbackEntityDraft(entityType, name, hint, existingData) {
+    const subject = String(name ?? '').trim()
+    const title = subject || 'Novo rascunho'
+    const direction = hint ? ` Direcao do usuario: ${compactAI(hint, 220)}.` : ''
+    const privateNote = `Rascunho local gerado porque o provedor de IA nao respondeu.${direction}`.trim()
+    const baseData = { dm_notes: privateNote }
+    const drafts = {
+      characters: {
+        name: title,
+        race: 'Humano',
+        class: 'Guerreiro',
+        level: 1,
+        description: `${title} e um aventureiro pronto para entrar na campanha.`,
+        backstory: 'Tem um objetivo pessoal ligado aos acontecimentos recentes da campanha.',
+        data: {
+          background: 'Forasteiro',
+          personality_traits: 'Observador e cauteloso.',
+          ideals: 'Protege quem depende dele.',
+          bonds: 'Busca provar seu valor.',
+          flaws: 'Assume responsabilidades demais.',
+          str: 14, dex: 12, con: 13, int: 10, wis: 11, cha: 10,
+          armor_class: 14,
+          hit_points: '12',
+          speed: '9 m',
+          proficiency_bonus: '+2',
+          saving_throws: 'Forca, Constituicao',
+          skills: 'Atletismo, Percepcao',
+          proficiencies: 'Armas simples, armas marciais, armaduras',
+          equipment: 'Arma marcial, armadura, kit de aventureiro',
+          features: 'Estilo de luta; Retomar o folego',
+          spellcasting: 'Nao possui conjuracao.',
+          player_notes: '',
+          goals: 'Encontrar um lugar no grupo.',
+          ...baseData,
+        },
+      },
+      npcs: {
+        role: 'Aliado potencial',
+        race: 'Humano',
+        description: `${title} conhece rumores uteis e pode aproximar o grupo de uma nova pista.`,
+        personality: 'Pragmatico, atento e dificil de impressionar.',
+        data: {
+          age: 'Adulto',
+          appearance: 'Roupas gastas, olhar atento e postura reservada.',
+          voice: 'Baixa e direta.',
+          motivation: 'Resolver um problema que ameaca sua rotina.',
+          fear: 'Ser usado por faccoes mais poderosas.',
+          mannerism: 'Tamborila os dedos quando mente.',
+          hook: 'Procura ajuda discreta dos aventureiros.',
+          ...baseData,
+        },
+      },
+      locations: {
+        name: title,
+        type: 'Outro',
+        description: `${title} e um local util para a proxima cena da campanha.`,
+        data: {
+          atmosphere: 'Tenso, mas cheio de oportunidades.',
+          climate: 'Variavel.',
+          history: 'Carrega marcas de conflitos ou passagens antigas.',
+          culture: 'Os moradores valorizam informacao e cautela.',
+          rulers: 'Autoridade local indefinida.',
+          dangers: 'Intrigas, emboscadas ou segredos mal guardados.',
+          plot_hook: 'Algo ali aponta para uma ameaca maior.',
+          ...baseData,
+        },
+      },
+      creatures: {
+        type: 'Monstruosidade',
+        cr: '1',
+        description: `${title} e uma ameaca simples, pronta para ajuste pelo mestre.`,
+        data: {
+          behavior: 'Ataca quando encurralada ou provocada.',
+          habitat: 'Ruinas, estradas isoladas ou areas selvagens.',
+          tactics: 'Tenta separar um alvo vulneravel.',
+          weaknesses: 'Pode recuar diante de fogo, luz forte ou numeros superiores.',
+          loot: 'Restos, couro ou um pequeno indicio narrativo.',
+          statBlock: true,
+          ac: '13 (armadura natural)',
+          hpText: '22 (4d8+4)',
+          speedText: '9 m',
+          str: 14, dex: 12, con: 12, int: 6, wis: 11, cha: 8,
+          senses: 'Percepcao passiva 10',
+          languages: '',
+          resist: '',
+          immune: '',
+          vulnerable: '',
+          conditionImmune: '',
+          traits: [],
+          actions: [{ name: 'Ataque', text: 'Ataque corpo a corpo com arma: +4 para acertar, alcance 1,5 m, um alvo. Acerto: 7 (1d8+3) de dano cortante.' }],
+          bonus: [],
+          reactions: [],
+          legendary: [],
+          ...baseData,
+        },
+      },
+      items: {
+        type: 'Outro',
+        rarity: 'Comum',
+        description: `${title} tem valor narrativo e pode virar pista, recompensa ou foco de cena.`,
+        properties: 'Item narrativo',
+        data: {
+          appearance: 'Marcado por uso recente.',
+          history: 'Passou por maos importantes antes de chegar ao grupo.',
+          curse: '',
+          itemBlock: true,
+          weight: 0,
+          valueText: 'A definir',
+          damage: '',
+          propertiesText: 'Item narrativo',
+          entries: 'Pode revelar informacoes quando examinado no contexto certo.',
+          requiresAttunement: false,
+          ...baseData,
+        },
+      },
+      spells: {
+        level: 1,
+        school: 'Abjuracao',
+        casting_time: '1 acao',
+        range: '18 m',
+        components: 'V,S',
+        duration: '1 minuto',
+        description: `${title} produz um efeito defensivo simples e ajustavel pelo mestre.`,
+        data: {
+          spellBlock: true,
+          castingTime: '1 acao',
+          range: '18 m',
+          componentsText: 'V,S',
+          duration: '1 minuto',
+          damageInflict: '',
+          savingThrow: '',
+          entries: 'Uma criatura voluntaria a alcance recebe +1 na CA ate a magia terminar.',
+          higherLevel: [{ name: 'Em niveis superiores', text: 'A magia pode afetar uma criatura adicional por nivel acima do 1.' }],
+          ...baseData,
+        },
+      },
+      notes: {
+        title,
+        content: `${title}\n\nAnotacao inicial criada para preservar o fluxo da mesa. Complete com nomes, pistas e consequencias conforme a campanha avancar.`,
+        is_secret: false,
+      },
+      groups: {
+        name: title,
+        type: 'Organizacao',
+        description: `${title} atua nos bastidores e pode se tornar aliado, rival ou fonte de missoes.`,
+        headquarters: 'Sede a definir',
+        motto: 'A definir',
+        secrets: 'Possui interesses que ainda nao foram revelados.',
+        data: {
+          plot_hook: 'Um membro procura o grupo com uma proposta arriscada.',
+          ...baseData,
+        },
+      },
+    }
+    return withExisting(existingData, drafts[entityType] ?? { name: title, description: `Rascunho inicial de ${title}.`, data: baseData })
+  }
+
   async function getCampaignContext(campaignId) {
     const [camp, npcs, locs, chars, groups] = await Promise.all([
-      db.query('SELECT title,description,scenario_type FROM campaigns WHERE id=$1', [campaignId]),
-      db.query('SELECT name,role,race FROM npcs WHERE campaign_id=$1 LIMIT 20', [campaignId]),
-      db.query('SELECT name,type FROM locations WHERE campaign_id=$1 LIMIT 20', [campaignId]),
-      db.query('SELECT name,race,class FROM characters WHERE campaign_id=$1', [campaignId]),
-      db.query('SELECT name,type FROM groups WHERE campaign_id=$1 LIMIT 20', [campaignId]),
+      db.query('SELECT title,LEFT(description,700) AS description,scenario_type FROM campaigns WHERE id=$1', [campaignId]),
+      db.query('SELECT name,role,race FROM npcs WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [campaignId]),
+      db.query('SELECT name,type FROM locations WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [campaignId]),
+      db.query('SELECT name,race,class FROM characters WHERE campaign_id=$1 ORDER BY name ASC LIMIT 12', [campaignId]),
+      db.query('SELECT name,type FROM groups WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [campaignId]),
     ])
-    const c = camp.rows[0]
+    const c = camp.rows[0] ?? {}
     return `Campanha: "${c.title}" (${c.scenario_type ?? 'fantasia'})
 Descrição: ${c.description ?? 'não definida'}
 Personagens: ${chars.rows.map(r => `${r.name} (${r.race} ${r.class})`).join(', ') || 'nenhum'}
@@ -76,7 +251,7 @@ REGRAS OBRIGATORIAS:
 
   function aiErrorMessage(err) {
     const message = err?.message ?? 'Erro desconhecido.'
-    if (/Groq não configurado|Groq nao configurado/i.test(message)) {
+    if (/Groq não configurad|Groq nao configurad|Nenhuma chave Groq/i.test(message)) {
       return 'IA não configurada no backend. Defina GROQ_API_KEY no Fly.'
     }
     if (/api key|unauthorized|authentication/i.test(message)) {
@@ -98,7 +273,7 @@ REGRAS OBRIGATORIAS:
     try {
       const ctx = await getCampaignContext(req.params.campaignId)
       const hint = req.body.hint ?? ''
-      const text = await complete(SYSTEM, `${ctx}\n\nCrie um NPC.${hint ? ` Direcao: "${hint}".` : ''}
+      const text = await completeJSON(SYSTEM, `${ctx}\n\nCrie um NPC.${hint ? ` Direcao: "${hint}".` : ''}
 Retorne JSON:
 {"name":"...","race":"...","role":"...","description":"...","personality":"...","secrets":"...","hook":"...","data":{"age":"...","appearance":"...","voice":"...","motivation":"...","fear":"...","mannerism":"...","plot_hook":"...","dm_notes":"..."}}
 Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases por campo.`, 950)
@@ -124,7 +299,7 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases
           parentContext = `\nLocal pai/mãe: "${parent.name}" (${parent.type ?? 'sem tipo'}). Descrição: ${parent.description ?? 'sem descrição'}. O novo local deve funcionar como sub-local coerente desse lugar.`
         }
       }
-      const text = await complete(SYSTEM, `${ctx}${parentContext}\n\nCrie um local para a campanha.${hint ? ` Direção: "${hint}".` : ''}
+      const text = await completeJSON(SYSTEM, `${ctx}${parentContext}\n\nCrie um local para a campanha.${hint ? ` Direção: "${hint}".` : ''}
 Retorne JSON:
 {"name":"...","type":"Cidade|Vila|Taverna|Castelo|Dungeon|Floresta|Ruína|Planície|Porto|Outro","description":"...","hook":"...","secret":"...","data":{"atmosphere":"...","climate":"...","history":"...","culture":"...","rulers":"...","dangers":"...","plot_hook":"...","dm_notes":"..."}}
 Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases por campo.`, 1050)
@@ -158,7 +333,7 @@ Inclua os campos data quando tiver uma boa ideia. Seja conciso: máximo 2 frases
     try {
       const { difficulty = 'Medio', location, theme } = req.body
       const ctx = await getCampaignContext(req.params.campaignId)
-      const text = await complete(SYSTEM,
+      const text = await completeJSON(SYSTEM,
         `${ctx}\n\nEncontro dificuldade "${difficulty}".${location ? ` Local: ${location}.` : ''} ${theme ? `Tema: ${theme}.` : ''}\nRetorne JSON:\n{"title":"...","description":"...","difficulty":"${difficulty}","monsters":[{"name":"...","quantity":1,"role":"..."}],"terrain":"...","twist":"...","loot":"..."}`,
         900
       )
@@ -266,11 +441,13 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
       const prompt = PROMPTS[entity_type]
       if (!prompt) return reply.status(400).send({ error: `Tipo não suportado: ${entity_type}` })
 
-      const text = await complete(SYSTEM, `${ctx}\n\n${PRIVACY_RULES}\n${prompt}`, 900)
+      const text = await completeJSON(SYSTEM, `${ctx}\n\n${PRIVACY_RULES}\n${prompt}`, 850)
       return reply.send(parseJSON(text))
     } catch (err) {
       req.log.error({ err }, 'Falha ao gerar rascunho de entidade')
-      return reply.status(500).send({ error: aiErrorMessage(err) })
+      const { entity_type, name, hint, data: draftData } = req.body ?? {}
+      reply.header('x-ai-fallback', 'local')
+      return reply.send(fallbackEntityDraft(entity_type, name, hint, draftData))
     }
   })
 
@@ -279,11 +456,11 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
       const { entity_type, entity_id, name, description, data: entityData } = req.body
 
       const [chars, npcs, locs, items, groups] = await Promise.all([
-        db.query('SELECT id,name,race,class,LEFT(description,120) AS description FROM characters WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name,role,race,LEFT(description,120) AS description FROM npcs WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name,type,LEFT(description,120) AS description FROM locations WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
-        db.query('SELECT id,name,type,rarity,LEFT(description,120) AS description FROM items WHERE campaign_id=$1 LIMIT 20', [req.params.campaignId]),
-        db.query('SELECT id,name,type,LEFT(description,120) AS description FROM groups WHERE campaign_id=$1 LIMIT 30', [req.params.campaignId]),
+        db.query('SELECT id,name,race,class,LEFT(description,90) AS description FROM characters WHERE campaign_id=$1 ORDER BY name ASC LIMIT 12', [req.params.campaignId]),
+        db.query('SELECT id,name,role,race,LEFT(description,90) AS description FROM npcs WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [req.params.campaignId]),
+        db.query('SELECT id,name,type,LEFT(description,90) AS description FROM locations WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [req.params.campaignId]),
+        db.query('SELECT id,name,type,rarity,LEFT(description,90) AS description FROM items WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 10', [req.params.campaignId]),
+        db.query('SELECT id,name,type,LEFT(description,90) AS description FROM groups WHERE campaign_id=$1 ORDER BY updated_at DESC LIMIT 12', [req.params.campaignId]),
       ])
 
       const allEntities = [
@@ -301,10 +478,10 @@ Se o nome estiver como "sem nome definido", invente um nome coerente. Seja conci
     return `[${e.type}/${e.id}] ${e.name}${meta ? ` (${meta})` : ''}${e.description ? `: ${e.description}` : ''}`
   }).join('\n')
   const sourceContext = [
-    description ? `Descricao: ${compactAI(description, 900)}` : 'Descricao: (sem descricao)',
-    entityData ? `Dados adicionais: ${compactAI(entityData, 1600)}` : '',
+    description ? `Descricao: ${compactAI(description, 500)}` : 'Descricao: (sem descricao)',
+    entityData ? `Dados adicionais: ${compactAI(entityData, 700)}` : '',
   ].filter(Boolean).join('\n')
-  const text = await complete(SYSTEM,
+  const text = await completeJSON(SYSTEM,
     `Nova entidade criada: ${entity_type} chamado(a) "${name}".
 ${sourceContext}
 Entidades existentes na campanha:
@@ -318,7 +495,7 @@ Retorne JSON:
 Use exatamente um dos ids listados. Nao invente ids, nao use nomes como id e nao inclua prefixos como "npcs/" dentro de target_id.
 Use "outro" apenas quando nenhum tipo existente representar a relacao. Use "rivalidade" para inimizade, odio ou hostilidade.
 Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestions":[]}.`,
-1200
+650
 )
       let parsed
       try {
@@ -352,8 +529,8 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
         .slice(0, 5)
       return reply.send({ suggestions })
     } catch (err) {
-      req.log.error({ err }, 'Falha ao sugerir links')
-      return reply.status(500).send({ error: aiErrorMessage(err) })
+      req.log.warn({ err }, 'Falha ao sugerir links; retornando lista vazia')
+      return reply.send({ suggestions: [] })
     }
   })
 
@@ -368,33 +545,33 @@ Só inclua sugestões com confidence >= 0.6. Se não houver, retorne {"suggestio
   const emptyId = '00000000-0000-0000-0000-000000000000'
   const [npcs, locations, items, characters, notes] = await Promise.all([
     db.query(
-      `SELECT id, name, role, race, is_alive, LEFT(description, 80) AS description FROM npcs
+      `SELECT id, name, role, race, is_alive, LEFT(description, 70) AS description FROM npcs
        WHERE campaign_id=$1 AND id != $2
-       ORDER BY updated_at DESC LIMIT 30`,
+       ORDER BY updated_at DESC LIMIT 12`,
       [req.params.campaignId, entity_type === 'npcs' ? entity_id : emptyId]
     ),
     db.query(
-      `SELECT id, name, type, LEFT(description, 80) AS description FROM locations
+      `SELECT id, name, type, LEFT(description, 70) AS description FROM locations
        WHERE campaign_id=$1 AND id != $2
-       ORDER BY updated_at DESC LIMIT 20`,
+       ORDER BY updated_at DESC LIMIT 10`,
       [req.params.campaignId, entity_type === 'locations' ? entity_id : emptyId]
     ),
     db.query(
-      `SELECT id, name, type, LEFT(description, 80) AS description FROM items
+      `SELECT id, name, type, LEFT(description, 70) AS description FROM items
        WHERE campaign_id=$1 AND id != $2
-       ORDER BY updated_at DESC LIMIT 20`,
+       ORDER BY updated_at DESC LIMIT 10`,
       [req.params.campaignId, entity_type === 'items' ? entity_id : emptyId]
     ),
     db.query(
-      `SELECT id, name, race, class, LEFT(description, 80) AS description FROM characters
+      `SELECT id, name, race, class, LEFT(description, 70) AS description FROM characters
        WHERE campaign_id=$1 AND id != $2
-       ORDER BY name ASC`,
+       ORDER BY name ASC LIMIT 12`,
       [req.params.campaignId, entity_type === 'characters' ? entity_id : emptyId]
     ),
     db.query(
-      `SELECT id, title, LEFT(content, 80) AS content FROM notes
+      `SELECT id, title, LEFT(content, 70) AS content FROM notes
        WHERE campaign_id=$1 AND id != $2
-       ORDER BY updated_at DESC LIMIT 15`,
+       ORDER BY updated_at DESC LIMIT 8`,
       [req.params.campaignId, entity_type === 'notes' ? entity_id : emptyId]
     ),
   ])
@@ -407,8 +584,8 @@ Personagens: ${characters.rows.map(r => `[id:${r.id}] ${r.name} (${r.race ?? ''}
 Notas: ${notes.rows.map(r => `[id:${r.id}] ${r.title}${r.content ? ': ' + r.content.slice(0, 100) : ''}`).join('\n') || 'nenhuma'}
       `.trim()
 
-  const entityDesc = description ? description.slice(0, 400) : ''
-  const entityDataStr = entityData && typeof entityData === 'object' ? JSON.stringify(entityData).slice(0, 300) : ''
+  const entityDesc = description ? description.slice(0, 260) : ''
+  const entityDataStr = entityData && typeof entityData === 'object' ? JSON.stringify(entityData).slice(0, 220) : ''
   const targetLookup = new Map([
     ...npcs.rows.map(r => [`npcs:${r.id}`, { type: 'npcs', id: r.id, name: r.name }]),
     ...locations.rows.map(r => [`locations:${r.id}`, { type: 'locations', id: r.id, name: r.name }]),
@@ -416,7 +593,7 @@ Notas: ${notes.rows.map(r => `[id:${r.id}] ${r.title}${r.content ? ': ' + r.cont
     ...characters.rows.map(r => [`characters:${r.id}`, { type: 'characters', id: r.id, name: r.name }]),
   ])
 
-  const text = await complete(
+  const text = await completeJSON(
     `Você é um assistente especialista em narrativa de RPG que analisa entidades e sugere propagações de estado coerentes no mundo da campanha.
 REGRAS OBRIGATÓRIAS:
 
@@ -452,7 +629,7 @@ Retorne JSON:
   ]
 }
 Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
-    1200
+    550
   )
 
       let parsed
@@ -469,8 +646,8 @@ Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
 
       return reply.send({ propagations })
     } catch (err) {
-      req.log.error({ err }, 'Falha ao sugerir propagações')
-      return reply.status(500).send({ error: aiErrorMessage(err) })
+      req.log.warn({ err }, 'Falha ao sugerir propagacoes; retornando lista vazia')
+      return reply.send({ propagations: [] })
     }
   })
 

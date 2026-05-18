@@ -3,29 +3,68 @@ import Groq from 'groq-sdk'
 
 // ─── Configuração dos dois agentes Groq ──────────────────────────────────────
 
-const PRIMARY_MODEL   = process.env.GROQ_MODEL   ?? 'openai/gpt-oss-120b'
+const PRIMARY_MODEL = process.env.GROQ_MODEL ?? 'openai/gpt-oss-120b'
 const SECONDARY_MODEL = process.env.GROQ_MODEL_2 ?? 'llama-3.3-70b-versatile'
+const FAST_MODEL = process.env.GROQ_FAST_MODEL ?? 'llama-3.1-8b-instant'
+const AI_TIMEOUT_MS = Math.max(3000, Number(process.env.AI_TIMEOUT_MS) || 14000)
+const AI_MAX_RETRIES = Math.max(0, Number(process.env.AI_MAX_RETRIES) || 0)
 
-let _groqPrimary
-let _groqSecondary
+const providerState = new Map()
 
-function getGroqPrimary() {
-  if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY não configurada.')
-  }
-  if (!_groqPrimary) {
-    _groqPrimary = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  }
-  return _groqPrimary
+function providerKey(provider) {
+  return `${provider.label}:${provider.model}:${provider.apiKey?.slice(-8) ?? 'no-key'}`
 }
 
-function getGroqSecondary() {
-  if (!_groqSecondary) {
-    const key = process.env.GROQ_API_KEY_2 ?? process.env.GROQ_API_KEY
-    if (!key) throw new Error('Nenhuma chave Groq configurada.')
-    _groqSecondary = new Groq({ apiKey: key })
+function buildProviders() {
+  const primaryKey = process.env.GROQ_API_KEY
+  const secondaryKey = process.env.GROQ_API_KEY_2 ?? process.env.GROQ_API_KEY
+  const fastKey = process.env.GROQ_FAST_API_KEY ?? process.env.GROQ_API_KEY_2 ?? process.env.GROQ_API_KEY
+  const providers = [
+    { label: 'primary', apiKey: primaryKey, model: PRIMARY_MODEL },
+    { label: 'secondary', apiKey: secondaryKey, model: SECONDARY_MODEL },
+    { label: 'fast', apiKey: fastKey, model: FAST_MODEL },
+  ].filter(provider => provider.apiKey && provider.model)
+
+  const seen = new Set()
+  return providers.filter(provider => {
+    const key = `${provider.apiKey}:${provider.model}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function getProviderClient(provider) {
+  const key = providerKey(provider)
+  const state = providerState.get(key) ?? {}
+  if (!state.client) {
+    state.client = new Groq({
+      apiKey: provider.apiKey,
+      timeout: AI_TIMEOUT_MS,
+      maxRetries: AI_MAX_RETRIES,
+    })
   }
-  return _groqSecondary
+  providerState.set(key, state)
+  return state.client
+}
+
+function getCooldown(provider) {
+  return providerState.get(providerKey(provider))?.cooldownUntil ?? 0
+}
+
+function setCooldown(provider, err) {
+  const retryAfterSeconds = Number(err?.headers?.['retry-after'])
+  const retryAfterMs = Number(err?.headers?.['retry-after-ms'])
+  const fromHeader = Number.isFinite(retryAfterMs) && retryAfterMs > 0
+    ? retryAfterMs
+    : Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+    ? retryAfterSeconds * 1000
+    : 60_000
+  const capped = Math.min(Math.max(fromHeader, 30_000), 30 * 60_000)
+  const key = providerKey(provider)
+  const state = providerState.get(key) ?? {}
+  state.cooldownUntil = Date.now() + capped
+  providerState.set(key, state)
 }
 
 // ─── Detecção de erros recuperáveis ──────────────────────────────────────────
@@ -48,16 +87,22 @@ function isRecoverableError(err) {
 
 // ─── Chamada bruta Groq ──────────────────────────────────────────────────────
 
-async function callGroq(client, model, systemPrompt, messages, maxTokens) {
-  const msg = await client.chat.completions.create({
+async function callGroq(client, model, systemPrompt, messages, maxTokens, options = {}) {
+  const body = {
     model,
     max_tokens: maxTokens,
+    temperature: options.temperature ?? 0.8,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages,
     ],
+  }
+  if (options.json) body.response_format = { type: 'json_object' }
+  const msg = await client.chat.completions.create(body, {
+    timeout: options.timeout ?? AI_TIMEOUT_MS,
+    maxRetries: options.maxRetries ?? AI_MAX_RETRIES,
   })
-  return msg.choices[0].message.content
+  return msg.choices?.[0]?.message?.content ?? ''
 }
 
 function validateContent(content, path) {
@@ -86,38 +131,62 @@ function validateMessages(systemPrompt, messages, maxTokens) {
 
 // ─── Wrapper com fallback ────────────────────────────────────────────────────
 
-async function completeWithFallback(systemPrompt, messages, maxTokens) {
+async function completeWithProviderFallback(systemPrompt, messages, maxTokens, options = {}) {
   validateMessages(systemPrompt, messages, maxTokens)
+  const providers = buildProviders()
+  if (!providers.length) throw new Error('Nenhuma chave Groq configurada.')
 
-  try {
-    return await callGroq(getGroqPrimary(), PRIMARY_MODEL, systemPrompt, messages, maxTokens)
-  } catch (primaryErr) {
-    if (!isRecoverableError(primaryErr)) throw primaryErr
-    console.warn(`[ai] Chave primária falhou (${primaryErr?.status ?? primaryErr?.message}). Tentando chave secundária...`)
+  let lastErr
+  for (const provider of providers) {
+    const cooldownUntil = getCooldown(provider)
+    if (cooldownUntil > Date.now()) {
+      lastErr ??= new Error(`Provedor ${provider.label}/${provider.model} em cooldown por limite de uso.`)
+      continue
+    }
+
+    try {
+      const result = await callGroq(
+        getProviderClient(provider),
+        provider.model,
+        systemPrompt,
+        messages,
+        maxTokens,
+        options
+      )
+      if (provider.label !== 'primary') {
+        console.info(`[ai] ${provider.label}/${provider.model} respondeu com sucesso.`)
+      }
+      return result
+    } catch (err) {
+      lastErr = err
+      const status = err?.status ?? err?.statusCode ?? err?.response?.status
+      if (status === 429) setCooldown(provider, err)
+      console.warn(`[ai] ${provider.label}/${provider.model} falhou (${status ?? err?.message}).`)
+      if (!isRecoverableError(err)) throw err
+    }
   }
 
-  try {
-    const result = await callGroq(getGroqSecondary(), SECONDARY_MODEL, systemPrompt, messages, maxTokens)
-    console.info('[ai] Chave secundária respondeu com sucesso.')
-    return result
-  } catch (secondaryErr) {
-    console.error('[ai] Ambas as chaves falharam.', { secondary: secondaryErr?.message })
-    throw secondaryErr
-  }
+  console.error('[ai] Todos os provedores falharam.', { error: lastErr?.message })
+  throw lastErr ?? new Error('Todos os provedores de IA estao indisponiveis.')
 }
 
 // ─── API pública ─────────────────────────────────────────────────────────────
 
-export async function complete(systemPrompt, userPrompt, maxTokens = 1000) {
-  return completeWithFallback(
+export async function complete(systemPrompt, userPrompt, maxTokens = 1000, options = {}) {
+  return completeWithProviderFallback(
     systemPrompt,
     [{ role: 'user', content: userPrompt }],
-    maxTokens
+    maxTokens,
+    options
   )
 }
 
-export async function completeMessages(systemPrompt, messages, maxTokens = 1200) {
-  return completeWithFallback(systemPrompt, messages, maxTokens)
+export async function completeMessages(systemPrompt, messages, maxTokens = 1200, options = {}) {
+  return completeWithProviderFallback(systemPrompt, messages, maxTokens, options)
+}
+
+export async function completeJSON(systemPrompt, userPrompt, maxTokens = 1000, options = {}) {
+  return complete(systemPrompt, userPrompt, maxTokens, { ...options, json: true })
 }
 
 // ─── Utilitários internos ─────────────────────────────────────────────────────
