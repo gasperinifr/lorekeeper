@@ -1,3 +1,5 @@
+import { cache, cacheKey, TTL } from '../lib/cache.js'
+
 export async function authenticate(req, reply) {
   try {
     await req.jwtVerify()
@@ -13,19 +15,24 @@ export async function requireCampaignAccess(req, reply) {
   const { db } = req.server
   const { campaignId } = req.params
   const userId = req.user.id
+  const key = cacheKey.campaignAccess(campaignId, userId)
 
-  const { rows } = await db.query(
-    `SELECT
-       CASE WHEN c.owner_id=$2 THEN 'admin' ELSE cm.role END AS role,
-       CASE WHEN c.owner_id=$2 THEN 'gm' ELSE COALESCE(cm.play_role,'player') END AS play_role
-     FROM campaigns c
-     LEFT JOIN campaign_members cm ON cm.campaign_id=c.id AND cm.user_id=$2
-     WHERE c.id=$1 AND (c.owner_id=$2 OR cm.user_id IS NOT NULL)`,
-    [campaignId, userId]
-  )
-  if (!rows.length) return reply.status(403).send({ error: 'Acesso negado.' })
-  req.campaignRole = rows[0].role
-  req.campaignPlayRole = rows[0].play_role ?? 'player'
+  const access = await cache.getOrSet(key, TTL.CAMPAIGN_ACCESS, async () => {
+    const { rows } = await db.query(
+      `SELECT
+         CASE WHEN c.owner_id=$2 THEN 'admin' ELSE cm.role END AS role,
+         CASE WHEN c.owner_id=$2 THEN 'gm' ELSE COALESCE(cm.play_role,'player') END AS play_role
+       FROM campaigns c
+       LEFT JOIN campaign_members cm ON cm.campaign_id=c.id AND cm.user_id=$2
+       WHERE c.id=$1 AND (c.owner_id=$2 OR cm.user_id IS NOT NULL)`,
+      [campaignId, userId]
+    )
+    return rows.length ? rows[0] : null
+  })
+
+  if (!access) return reply.status(403).send({ error: 'Acesso negado.' })
+  req.campaignRole     = access.role
+  req.campaignPlayRole = access.play_role ?? 'player'
 }
 
 export async function requireEditor(req, reply) {
@@ -35,4 +42,16 @@ export async function requireEditor(req, reply) {
   if (!['admin','editor'].includes(req.campaignRole)) {
     return reply.status(403).send({ error: 'Permissão de edição necessária.' })
   }
+}
+
+export function invalidateCampaignAccess(campaignId, userId) {
+  return cache.del(cacheKey.campaignAccess(campaignId, userId))
+}
+
+export function invalidateCampaignAllUsers(campaignId) {
+  return cache.delByPrefix(cacheKey.campaignPrefix(campaignId))
+}
+
+export function invalidateUserCampaignList(userId) {
+  return cache.del(cacheKey.campaignList(userId))
 }

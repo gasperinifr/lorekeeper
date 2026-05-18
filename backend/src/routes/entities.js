@@ -7,6 +7,7 @@ import {
   sanitizeEntityRow,
   sanitizeEntityRows,
 } from '../lib/audience.js'
+import { cache, cacheKey, TTL } from '../lib/cache.js'
 
 const AUDIENCE_FIELDS = ['visibility', 'shared_with_user_id']
 const ENTITY_CONFIG = {
@@ -134,6 +135,24 @@ async function filterVisibleLinks(db, req, entityType, id, links) {
   return filterLinksByAudience(db, req, links)
 }
 
+function entityListKey(campaignId, entityType, req) {
+  const roleKey = ['admin','editor'].includes(req.campaignRole) ? 'editor' : `viewer:${req.user.id}`
+  return cacheKey.entityList(campaignId, entityType, roleKey, req.user.id)
+}
+
+function entityDetailKey(campaignId, entityType, id, req) {
+  const scope = ['admin','editor'].includes(req.campaignRole) ? 'editor' : `viewer:${req.user.id}`
+  return cacheKey.entityDetail(campaignId, entityType, id, scope)
+}
+
+function invalidateEntityList(campaignId, entityType) {
+  return cache.delByPrefix(`campaign:${campaignId}:${entityType}:list:`)
+}
+
+function invalidateEntityDetail(campaignId, entityType, id) {
+  return cache.delByPrefix(cacheKey.entityDetailPrefix(campaignId, entityType, id))
+}
+
 export async function entityRoutes(fastify) {
   const { db } = fastify
 
@@ -141,11 +160,17 @@ export async function entityRoutes(fastify) {
     const base = `/campaigns/:campaignId/${entityType}`
 
     fastify.get(base, { preHandler: requireCampaignAccess }, async (req, reply) => {
-      const access = buildAudienceFilter(cfg, req, 2)
-      const { rows } = await db.query(
-        `SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE campaign_id=$1 ${access.sql} ORDER BY ${cfg.listOrder}`,
-        [req.params.campaignId, ...access.vals]
-      )
+      const { campaignId } = req.params
+      const key = entityListKey(campaignId, entityType, req)
+
+      const rows = await cache.getOrSet(key, TTL.ENTITY_LIST, async () => {
+        const access = buildAudienceFilter(cfg, req, 2)
+        const { rows } = await db.query(
+          `SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE campaign_id=$1 ${access.sql} ORDER BY ${cfg.listOrder}`,
+          [campaignId, ...access.vals]
+        )
+        return rows
+      })
       return reply.send(sanitizeEntityRows(rows, req, cfg.table))
     })
 
@@ -164,30 +189,52 @@ export async function entityRoutes(fastify) {
       const { rows } = await db.query(
         `INSERT INTO ${cfg.table} (${cols.join(',')}) VALUES (${placeholders.join(',')}) RETURNING *`, vals
       )
+      await invalidateEntityList(req.params.campaignId, entityType)
       return reply.status(201).send(sanitizeEntityRow(rows[0], req, cfg.table))
     })
 
     fastify.get(`${base}/:id`, { preHandler: requireCampaignAccess }, async (req, reply) => {
-      const access = buildAudienceFilter(cfg, req, 3)
-      const canSeePrivateEvents = ['admin', 'editor'].includes(req.campaignRole)
-      const eventVisibility = canSeePrivateEvents ? '' : "AND e.visibility='public'"
-      const [e, l, t, ev] = await Promise.all([
-        db.query(`SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`, [req.params.id, req.params.campaignId, ...access.vals]),
-        db.query(`SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type=$2 AND source_id=$3) OR (target_type=$2 AND target_id=$3))`, [req.params.campaignId, entityType, req.params.id]),
-        db.query(`SELECT t.id,t.name,t.color FROM tags t JOIN entity_tags et ON et.tag_id=t.id WHERE et.entity_type=$1 AND et.entity_id=$2`, [entityType, req.params.id]),
-        db.query(
-          `SELECT eel.*, e.title AS event_title, e.type AS event_type, e.impact AS event_impact,
-                  e.date_in_world AS event_date_in_world, e.visibility AS event_visibility
-           FROM event_entity_links eel
-           JOIN events e ON e.id=eel.event_id
-           WHERE eel.campaign_id=$1 AND eel.entity_type=$2 AND eel.entity_id=$3 ${eventVisibility}
-           ORDER BY e.created_at DESC`,
-          [req.params.campaignId, entityType, req.params.id]
-        ),
-      ])
-      if (!e.rows.length) return reply.status(404).send({ error: 'Entidade não encontrada.' })
-      const links = await filterVisibleLinks(db, req, entityType, req.params.id, l.rows)
-      return reply.send({ ...sanitizeEntityRow(e.rows[0], req, cfg.table), links, event_links: ev.rows, tags: t.rows, _role: req.campaignRole, _play_role: req.campaignPlayRole, _can_view_dm: canViewDm(req) })
+      const { campaignId, id } = req.params
+      const detailKey = entityDetailKey(campaignId, entityType, id, req)
+
+      const result = await cache.getOrSet(detailKey, TTL.ENTITY_DETAIL, async () => {
+        const access = buildAudienceFilter(cfg, req, 3)
+        const canSeePrivateEvents = ['admin', 'editor'].includes(req.campaignRole)
+        const eventVisibility = canSeePrivateEvents ? '' : "AND e.visibility='public'"
+        const [e, l, t, ev] = await Promise.all([
+          db.query(`SELECT *${cfg.extraSelect??''} FROM ${cfg.table} WHERE id=$1 AND campaign_id=$2 ${access.sql}`, [id, campaignId, ...access.vals]),
+          db.query(`SELECT * FROM entity_links WHERE campaign_id=$1 AND ((source_type=$2 AND source_id=$3) OR (target_type=$2 AND target_id=$3))`, [campaignId, entityType, id]),
+          db.query(`SELECT t.id,t.name,t.color FROM tags t JOIN entity_tags et ON et.tag_id=t.id WHERE et.entity_type=$1 AND et.entity_id=$2`, [entityType, id]),
+          db.query(
+            `SELECT eel.*, e.title AS event_title, e.type AS event_type, e.impact AS event_impact,
+                    e.date_in_world AS event_date_in_world, e.visibility AS event_visibility
+             FROM event_entity_links eel
+             JOIN events e ON e.id=eel.event_id
+             WHERE eel.campaign_id=$1 AND eel.entity_type=$2 AND eel.entity_id=$3 ${eventVisibility}
+             ORDER BY e.created_at DESC`,
+            [campaignId, entityType, id]
+          ),
+        ])
+        if (!e.rows.length) return null
+        const links = await filterVisibleLinks(db, req, entityType, id, l.rows)
+        return {
+          entity: e.rows[0],
+          links,
+          event_links: ev.rows,
+          tags: t.rows,
+        }
+      })
+
+      if (!result) return reply.status(404).send({ error: 'Entidade não encontrada.' })
+      return reply.send({
+        ...sanitizeEntityRow(result.entity, req, cfg.table),
+        links: result.links,
+        event_links: result.event_links,
+        tags: result.tags,
+        _role: req.campaignRole,
+        _play_role: req.campaignPlayRole,
+        _can_view_dm: canViewDm(req),
+      })
     })
 
     fastify.patch(`${base}/:id`, { preHandler: requireEditor }, async (req, reply) => {
@@ -211,6 +258,10 @@ export async function entityRoutes(fastify) {
       const { rows } = await db.query(
         `UPDATE ${cfg.table} SET ${sets.join(',')} WHERE id=$${nextIdx} AND campaign_id=$${nextIdx+1} RETURNING *`, vals
       )
+      await Promise.all([
+        invalidateEntityList(req.params.campaignId, entityType),
+        invalidateEntityDetail(req.params.campaignId, entityType, req.params.id),
+      ])
       return reply.send(sanitizeEntityRow(rows[0], req, cfg.table))
     })
 
@@ -222,6 +273,10 @@ export async function entityRoutes(fastify) {
         vals
       )
       if (!rowCount) return reply.status(404).send({ error: 'Entidade não encontrada.' })
+      await Promise.all([
+        invalidateEntityList(req.params.campaignId, entityType),
+        invalidateEntityDetail(req.params.campaignId, entityType, req.params.id),
+      ])
       return reply.status(204).send()
     })
   }

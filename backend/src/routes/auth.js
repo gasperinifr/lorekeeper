@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { cache, cacheKey, TTL } from '../lib/cache.js'
 
 export async function authRoutes(fastify) {
   const { db } = fastify
@@ -34,11 +35,18 @@ export async function authRoutes(fastify) {
   })
 
   fastify.get('/me', { preHandler: authenticate }, async (req, reply) => {
-    const { rows } = await db.query(
-      'SELECT id,username,email,avatar_url,created_at FROM users WHERE id=$1', [req.user.id]
-    )
-    if (!rows.length) return reply.status(404).send({ error: 'Usuário não encontrado.' })
-    return reply.send(rows[0])
+    const userId = req.user.id
+    const key = cacheKey.userProfile(userId)
+
+    const user = await cache.getOrSet(key, TTL.USER_PROFILE, async () => {
+      const { rows } = await db.query(
+        'SELECT id,username,email,avatar_url,created_at FROM users WHERE id=$1', [userId]
+      )
+      return rows[0] ?? null
+    })
+
+    if (!user) return reply.status(404).send({ error: 'Usuário não encontrado.' })
+    return reply.send(user)
   })
 
   fastify.patch('/me', { preHandler: authenticate }, async (req, reply) => {
@@ -58,6 +66,8 @@ export async function authRoutes(fastify) {
       [username, req.user.id]
     )
     if (!rows.length) return reply.status(404).send({ error: 'Usuário não encontrado.' })
+
+    await cache.del(cacheKey.userProfile(req.user.id))
 
     const token = fastify.jwt.sign({ id: rows[0].id, username: rows[0].username })
     return reply.send({ user: rows[0], token })

@@ -1,5 +1,6 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
 import { filterVisibleLinks } from '../lib/audience.js'
+import { cache, cacheKey } from '../lib/cache.js'
 
 const VALID = ['characters','npcs','locations','items','spells','creatures','notes','sessions','arcs','encounters','events','groups']
 const RELATION_TYPES = [
@@ -56,6 +57,17 @@ function normalizeRelationType(rawType, relationText = '') {
 export async function linkRoutes(fastify) {
   const { db } = fastify
 
+  function invalidateLinkedDetails(campaignId, ...links) {
+    return Promise.all(
+      links
+        .filter(link => link?.source_type && link?.source_id && link?.target_type && link?.target_id)
+        .flatMap(link => [
+          cache.delByPrefix(cacheKey.entityDetailPrefix(campaignId, link.source_type, link.source_id)),
+          cache.delByPrefix(cacheKey.entityDetailPrefix(campaignId, link.target_type, link.target_id)),
+        ])
+    )
+  }
+
   async function entityExists(type, id, campaignId) {
     const table = LINK_TABLES[type]
     if (!table || !UUID_RE.test(String(id))) return false
@@ -93,12 +105,14 @@ export async function linkRoutes(fastify) {
        RETURNING *`,
       [req.params.campaignId, source_type, source_id, target_type, target_id, relation_label, relation_type]
     )
+    await invalidateLinkedDetails(req.params.campaignId, rows[0])
     return reply.status(201).send(rows[0])
   })
 
   fastify.delete('/campaigns/:campaignId/links/:id', { preHandler: requireEditor }, async (req, reply) => {
-    const { rowCount } = await db.query('DELETE FROM entity_links WHERE id=$1 AND campaign_id=$2', [req.params.id, req.params.campaignId])
-    if (!rowCount) return reply.status(404).send({ error: 'Link não encontrado.' })
+    const { rows } = await db.query('DELETE FROM entity_links WHERE id=$1 AND campaign_id=$2 RETURNING *', [req.params.id, req.params.campaignId])
+    if (!rows.length) return reply.status(404).send({ error: 'Link não encontrado.' })
+    await invalidateLinkedDetails(req.params.campaignId, rows[0])
     return reply.status(204).send()
   })
 

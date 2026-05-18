@@ -1,5 +1,6 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
 import { filterVisibleEventEntityLinks } from '../lib/audience.js'
+import { cache, cacheKey } from '../lib/cache.js'
 
 const VALID_TYPES = [
   'batalha', 'revelacao', 'morte', 'alianca', 'descoberta',
@@ -13,6 +14,22 @@ const VALID_ENTITY_TYPES = [
 
 export async function eventRoutes(fastify) {
   const { db } = fastify
+
+  function invalidateEntityDetail(campaignId, entityType, entityId) {
+    return cache.delByPrefix(cacheKey.entityDetailPrefix(campaignId, entityType, entityId))
+  }
+
+  function invalidateEntityList(campaignId, entityType) {
+    return cache.delByPrefix(`campaign:${campaignId}:${entityType}:list:`)
+  }
+
+  async function invalidateEventEntityDetails(campaignId, eventId) {
+    const { rows } = await db.query(
+      'SELECT entity_type, entity_id FROM event_entity_links WHERE campaign_id=$1 AND event_id=$2',
+      [campaignId, eventId]
+    )
+    await Promise.all(rows.map(row => invalidateEntityDetail(campaignId, row.entity_type, row.entity_id)))
+  }
 
   fastify.get('/campaigns/:campaignId/events', { preHandler: requireCampaignAccess }, async (req, reply) => {
     const { campaignId } = req.params
@@ -113,6 +130,8 @@ export async function eventRoutes(fastify) {
       }
     }
 
+    await invalidateEventEntityDetails(campaignId, event.id)
+
     const { rows: links } = await db.query(
       'SELECT * FROM event_entity_links WHERE event_id=$1',
       [event.id]
@@ -139,10 +158,12 @@ export async function eventRoutes(fastify) {
       [...vals, eventId, campaignId]
     )
     if (!rows.length) return reply.status(404).send({ error: 'Evento não encontrado.' })
+    await invalidateEventEntityDetails(campaignId, eventId)
     return reply.send(rows[0])
   })
 
   fastify.delete('/campaigns/:campaignId/events/:eventId', { preHandler: requireEditor }, async (req, reply) => {
+    await invalidateEventEntityDetails(req.params.campaignId, req.params.eventId)
     const { rowCount } = await db.query(
       'DELETE FROM events WHERE id=$1 AND campaign_id=$2',
       [req.params.eventId, req.params.campaignId]
@@ -164,15 +185,17 @@ export async function eventRoutes(fastify) {
        RETURNING *`,
       [eventId, campaignId, entity_type, entity_id, role ?? null]
     )
+    await invalidateEntityDetail(campaignId, entity_type, entity_id)
     return reply.status(201).send(rows[0])
   })
 
   fastify.delete('/campaigns/:campaignId/events/:eventId/links/:linkId', { preHandler: requireEditor }, async (req, reply) => {
-    const { rowCount } = await db.query(
-      'DELETE FROM event_entity_links WHERE id=$1 AND event_id=$2',
+    const { rows } = await db.query(
+      'DELETE FROM event_entity_links WHERE id=$1 AND event_id=$2 RETURNING entity_type, entity_id',
       [req.params.linkId, req.params.eventId]
     )
-    if (!rowCount) return reply.status(404).send({ error: 'Link não encontrado.' })
+    if (!rows.length) return reply.status(404).send({ error: 'Link não encontrado.' })
+    await invalidateEntityDetail(req.params.campaignId, rows[0].entity_type, rows[0].entity_id)
     return reply.status(204).send()
   })
 
@@ -218,6 +241,11 @@ export async function eventRoutes(fastify) {
       'UPDATE events SET data = data || $1::jsonb, updated_at=NOW() WHERE id=$2',
       [JSON.stringify({ propagated_at: new Date().toISOString(), applied }), eventId]
     )
+
+    await Promise.all(applied.flatMap(row => [
+      invalidateEntityList(campaignId, row.entity_type),
+      invalidateEntityDetail(campaignId, row.entity_type, row.entity_id),
+    ]))
 
     return reply.send({ applied })
   })

@@ -1,6 +1,7 @@
 import { requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
 import { complete, completeMessages, getCampaignContextFull } from '../lib/ai.js'
 import { canViewDm } from '../lib/audience.js'
+import { cache, cacheKey } from '../lib/cache.js'
 
 export async function aiRoutes(fastify) {
   const { db } = fastify
@@ -19,6 +20,13 @@ export async function aiRoutes(fastify) {
     items: 'items',
     group: 'groups',
     groups: 'groups',
+  }
+
+  function invalidateEntityCaches(campaignId, entityType, entityId) {
+    return Promise.all([
+      cache.delByPrefix(`campaign:${campaignId}:${entityType}:list:`),
+      cache.delByPrefix(cacheKey.entityDetailPrefix(campaignId, entityType, entityId)),
+    ])
   }
 
   function parseJSON(text) {
@@ -525,6 +533,7 @@ Se não houver propagações óbvias e diretas, retorne {"propagations":[]}.`,
       return reply.status(400).send({ error: `Campo "${field}" não permitido para propagação.` })
     }
 
+    await invalidateEntityCaches(campaignId, target_type, target_id)
     return reply.send({ ok: true, target_type, target_id, field, value })
   })
 

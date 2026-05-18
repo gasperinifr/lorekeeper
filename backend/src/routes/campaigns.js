@@ -1,4 +1,5 @@
-import { authenticate, requireCampaignAccess, requireEditor } from '../middleware/authenticate.js'
+import { authenticate, requireCampaignAccess, requireEditor, invalidateCampaignAllUsers, invalidateUserCampaignList } from '../middleware/authenticate.js'
+import { cache, cacheKey, TTL } from '../lib/cache.js'
 import crypto from 'node:crypto'
 
 function createInviteCode() {
@@ -39,14 +40,20 @@ export async function campaignRoutes(fastify) {
   const { db } = fastify
 
   fastify.get('/', { preHandler: authenticate }, async (req, reply) => {
-    const { rows } = await db.query(
-      `SELECT c.*, cm.role, cm.play_role,
-        (SELECT COUNT(*) FROM campaign_members WHERE campaign_id=c.id) AS member_count
-       FROM campaigns c
-       JOIN campaign_members cm ON cm.campaign_id=c.id AND cm.user_id=$1
-       ORDER BY c.updated_at DESC`,
-      [req.user.id]
-    )
+    const userId = req.user.id
+    const key = cacheKey.campaignList(userId)
+
+    const rows = await cache.getOrSet(key, TTL.CAMPAIGN_LIST, async () => {
+      const { rows } = await db.query(
+        `SELECT c.*, cm.role, cm.play_role,
+          (SELECT COUNT(*) FROM campaign_members WHERE campaign_id=c.id) AS member_count
+         FROM campaigns c
+         JOIN campaign_members cm ON cm.campaign_id=c.id AND cm.user_id=$1
+         ORDER BY c.updated_at DESC`,
+        [userId]
+      )
+      return rows
+    })
     return reply.send(rows)
   })
 
@@ -62,6 +69,7 @@ export async function campaignRoutes(fastify) {
       `INSERT INTO campaign_members (campaign_id,user_id,role,play_role) VALUES ($1,$2,'admin','gm')`,
       [rows[0].id, req.user.id]
     )
+    await invalidateUserCampaignList(req.user.id)
     return reply.status(201).send(rows[0])
   })
 
@@ -91,6 +99,11 @@ export async function campaignRoutes(fastify) {
     )
     await db.query('UPDATE campaign_invites SET used_at=NOW(),used_by=$1 WHERE id=$2', [req.user.id, invite.id])
 
+    await Promise.all([
+      invalidateUserCampaignList(req.user.id),
+      cache.del(cacheKey.campaignAccess(invite.campaign_id, req.user.id)),
+    ])
+
     return reply.status(201).send({
       campaign_id: invite.campaign_id,
       title: invite.title,
@@ -100,18 +113,25 @@ export async function campaignRoutes(fastify) {
   })
 
   fastify.get('/:campaignId', { preHandler: requireCampaignAccess }, async (req, reply) => {
-    const { rows } = await db.query(
-      `SELECT c.*, cm_current.role, cm_current.play_role,
-        (SELECT json_agg(json_build_object('id',u.id,'username',u.username,'role',cm.role,'play_role',cm.play_role))
-         FROM campaign_members cm JOIN users u ON u.id=cm.user_id
-         WHERE cm.campaign_id=c.id) AS members
-       FROM campaigns c
-       JOIN campaign_members cm_current ON cm_current.campaign_id=c.id AND cm_current.user_id=$2
-       WHERE c.id=$1`,
-      [req.params.campaignId, req.user.id]
-    )
-    if (!rows.length) return reply.status(404).send({ error: 'Campanha não encontrada.' })
-    return reply.send(rows[0])
+    const { campaignId } = req.params
+    const userId = req.user.id
+    const key = cacheKey.campaignDetail(campaignId, userId)
+
+    const campaign = await cache.getOrSet(key, TTL.CAMPAIGN_DETAIL, async () => {
+      const { rows } = await db.query(
+        `SELECT c.*, cm_current.role, cm_current.play_role,
+          (SELECT json_agg(json_build_object('id',u.id,'username',u.username,'role',cm.role,'play_role',cm.play_role))
+           FROM campaign_members cm JOIN users u ON u.id=cm.user_id
+           WHERE cm.campaign_id=c.id) AS members
+         FROM campaigns c
+         JOIN campaign_members cm_current ON cm_current.campaign_id=c.id AND cm_current.user_id=$2
+         WHERE c.id=$1`,
+        [campaignId, userId]
+      )
+      return rows[0] ?? null
+    })
+    if (!campaign) return reply.status(404).send({ error: 'Campanha não encontrada.' })
+    return reply.send(campaign)
   })
 
   fastify.patch('/:campaignId', { preHandler: requireEditor }, async (req, reply) => {
@@ -125,12 +145,15 @@ export async function campaignRoutes(fastify) {
     updates.push('updated_at=NOW()')
     vals.push(req.params.campaignId)
     const { rows } = await db.query(`UPDATE campaigns SET ${updates.join(',')} WHERE id=$${i} RETURNING *`, vals)
+
+    await invalidateCampaignAllUsers(req.params.campaignId)
     return reply.send(rows[0])
   })
 
   fastify.delete('/:campaignId', { preHandler: requireEditor }, async (req, reply) => {
     if (req.campaignRole !== 'admin') return reply.status(403).send({ error: 'Apenas admins podem excluir.' })
     await db.query('DELETE FROM campaigns WHERE id=$1', [req.params.campaignId])
+    await invalidateCampaignAllUsers(req.params.campaignId)
     return reply.status(204).send()
   })
 
@@ -149,6 +172,11 @@ export async function campaignRoutes(fastify) {
        ON CONFLICT (campaign_id,user_id) DO UPDATE SET role=$3,play_role=$4 RETURNING *`,
       [req.params.campaignId, u[0].id, memberRole, memberPlayRole]
     )
+    await Promise.all([
+      cache.del(cacheKey.campaignAccess(req.params.campaignId, u[0].id)),
+      cache.del(cacheKey.campaignList(u[0].id)),
+      invalidateCampaignAllUsers(req.params.campaignId),
+    ])
     return reply.status(201).send(rows[0])
   })
 
@@ -170,6 +198,9 @@ export async function campaignRoutes(fastify) {
       vals
     )
     if (!rows.length) return reply.status(404).send({ error: 'Membro não encontrado.' })
+
+    await cache.del(cacheKey.campaignAccess(req.params.campaignId, req.params.memberId))
+    await invalidateCampaignAllUsers(req.params.campaignId)
     return reply.send(rows[0])
   })
 

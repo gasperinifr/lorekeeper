@@ -1,3 +1,4 @@
+import '../env.js'
 import Groq from 'groq-sdk'
 
 // ─── Configuração dos dois agentes Groq ──────────────────────────────────────

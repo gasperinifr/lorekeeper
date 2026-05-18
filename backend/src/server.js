@@ -1,10 +1,11 @@
 import Fastify        from 'fastify'
 import cors           from '@fastify/cors'
 import jwt            from '@fastify/jwt'
-import 'dotenv/config'
+import './env.js'
 import { db }               from './db/client.js'
 import { ensureSchema }     from './db/ensureSchema.js'
 import { ensureBucket }     from './lib/storage.js'
+import { cache }            from './lib/cache.js'
 import { authRoutes }       from './routes/auth.js'
 import { campaignRoutes }   from './routes/campaigns.js'
 import { entityRoutes }     from './routes/entities.js'
@@ -24,6 +25,9 @@ const fastify = Fastify({ logger: true })
 
 fastify.decorate('db', db)
 await ensureSchema(db)
+
+await cache.connect()
+fastify.decorate('cache', cache)
 await fastify.register(cors, { origin: true })
 await fastify.register(jwt,  { secret: process.env.JWT_SECRET })
 
